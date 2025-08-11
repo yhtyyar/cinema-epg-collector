@@ -69,13 +69,21 @@ cd cinema-epg-collector
 
 2. Запустите сервисы:
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
 
 3. Проверьте статус:
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 ```
+
+**Примечание**: Приложение использует порт 8081 (вместо 8080) и PostgreSQL на порту 5433 (вместо 5432) для избежания конфликтов с локальными сервисами.
+
+### Docker конфигурация
+
+Проект включает два конфигурационных файла:
+- `config.yaml` — для локальной разработки (localhost)
+- `config.docker.yaml` — для Docker Compose (имена сервисов: postgres, redis)
 
 ### Локальная разработка
 
