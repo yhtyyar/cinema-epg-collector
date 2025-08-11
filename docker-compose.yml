@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -35,7 +35,7 @@ services:
     build: .
     container_name: cinema_epg_app
     ports:
-      - "8080:8080"
+      - "8081:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,7 +45,7 @@ services:
       - DATABASE_HOST=postgres
       - REDIS_HOST=redis
     volumes:
-      - ./config.yaml:/app/config.yaml
+      - ./config.docker.yaml:/root/config.yaml
     restart: unless-stopped
 
 volumes:
