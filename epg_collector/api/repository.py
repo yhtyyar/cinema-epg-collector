@@ -1,0 +1,170 @@
+from __future__ import annotations
+
+import json
+import pathlib
+from typing import Any, Dict, List, Optional, Tuple
+
+from epg_collector.api.models import EPGData, KinoData, Metadata, Movie
+
+
+class MoviesRepository:
+    def __init__(self, data_path: str = "data/enriched_movies.json") -> None:
+        self._path = pathlib.Path(data_path)
+        self._raw: List[Dict[str, Any]] = []
+        self._load()
+
+    def _load(self) -> None:
+        if not self._path.exists():
+            self._raw = []
+            return
+        self._raw = json.loads(self._path.read_text(encoding="utf-8"))
+
+    def _to_iso(self, val: Optional[str], epoch: Optional[int]) -> Optional[str]:
+        if val:
+            # convert 'YYYY-MM-DD HH:MM:SS' -> ISO 'YYYY-MM-DDTHH:MM:SS'
+            return val.replace(" ", "T")
+        if epoch:
+            # seconds since epoch to ISO (UTC)
+            from datetime import datetime, timezone
+            return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
+        return None
+
+    def _poster_url(self, poster_local: Optional[str], kinopoisk: Optional[Dict[str, Any]]) -> Optional[str]:
+        if poster_local:
+            # Map local file within data/ to /static path so it is served by the API
+            # Example: data/posters/xyz.jpg -> /static/posters/xyz.jpg
+            norm = poster_local.replace("\\", "/")
+            if norm.startswith("data/"):
+                relative = norm[len("data/"):]
+                return "/static/" + relative
+            return "/static/" + norm
+        if kinopoisk and isinstance(kinopoisk, dict):
+            return kinopoisk.get("poster_url")
+        return None
+
+    def _normalize(self, item: Dict[str, Any]) -> Movie:
+        kinopoisk = item.get("kinopoisk") or {}
+        rating = kinopoisk.get("rating_kp") or kinopoisk.get("rating_imdb")
+        try:
+            rating_val: Optional[float] = float(rating) if rating is not None else None
+        except (TypeError, ValueError):
+            rating_val = None
+
+        genres = kinopoisk.get("genres")
+        if isinstance(genres, list):
+            genres_list = [str(g) for g in genres]
+        else:
+            genres_list = None
+
+        epg = EPGData(
+            title=item.get("title"),
+            description=item.get("desc"),
+            broadcast_time=self._to_iso(item.get("mskdatetimestart"), item.get("timestart")),
+            preview_image=item.get("preview"),
+        )
+        kino = None
+        if kinopoisk:
+            kino = KinoData(
+                title=kinopoisk.get("name"),
+                original_title=None,
+                year=kinopoisk.get("year"),
+                rating=rating_val,
+                description=None,
+                poster_url=self._poster_url(item.get("poster_local"), kinopoisk),
+                genres=genres_list,
+                duration=None,
+            )
+        else:
+            kino = KinoData(
+                title=None,
+                original_title=None,
+                year=None,
+                rating=None,
+                description=None,
+                poster_url=self._poster_url(item.get("poster_local"), None),
+                genres=None,
+                duration=None,
+            )
+
+        meta = Metadata(
+            created_at=None,
+            updated_at=None,
+            source="enriched",
+        )
+
+        return Movie(
+            id=str(item.get("id")),
+            epg_data=epg,
+            kinopoisk_data=kino,
+            metadata=meta,
+        )
+
+    def get_by_id(self, movie_id: str) -> Optional[Movie]:
+        for it in self._raw:
+            if str(it.get("id")) == str(movie_id):
+                return self._normalize(it)
+        return None
+
+    def list_movies(
+        self,
+        page: int = 1,
+        per_page: int = 50,
+        genre: Optional[str] = None,
+        year: Optional[int] = None,
+        rating_gte: Optional[float] = None,
+        source: Optional[str] = None,
+        search_q: Optional[str] = None,
+    ) -> Tuple[List[Movie], int]:
+        """Возвращает (movies, total) с фильтрацией и пагинацией.
+
+        Если указан search_q, выполняется поиск по epg.title и kinopoisk.name.
+        """
+        data = self._raw
+
+        # Фильтры
+        def predicate(it: Dict[str, Any]) -> bool:
+            if genre:
+                kin = it.get("kinopoisk") or {}
+                genres = kin.get("genres") or []
+                if isinstance(genres, list):
+                    if genre not in [str(g) for g in genres]:
+                        return False
+                else:
+                    return False
+            if year is not None:
+                kin = it.get("kinopoisk") or {}
+                if kin.get("year") != year:
+                    return False
+            if rating_gte is not None:
+                kin = it.get("kinopoisk") or {}
+                rv = kin.get("rating_kp") or kin.get("rating_imdb")
+                try:
+                    rvf = float(rv) if rv is not None else None
+                except (TypeError, ValueError):
+                    rvf = None
+                if rvf is None or rvf < rating_gte:
+                    return False
+            if source:
+                src = it.get("poster_source")
+                if src != source:
+                    return False
+            if search_q:
+                q = str(search_q).lower()
+                epg_title = str(it.get("title") or "").lower()
+                kin_title = str((it.get("kinopoisk") or {}).get("name") or "").lower()
+                if q not in epg_title and q not in kin_title:
+                    return False
+            return True
+
+        filtered = [it for it in data if predicate(it)]
+        total = len(filtered)
+
+        # Пагинация
+        if per_page <= 0:
+            per_page = 50
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_items = filtered[start:end]
+
+        movies = [self._normalize(it) for it in page_items]
+        return movies, total

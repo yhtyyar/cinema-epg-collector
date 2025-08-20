@@ -1,75 +1,49 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 *.so
-*.dylib
+*.egg-info/
+*.dist-info/
+.eggs/
 
-# Test binary, built with `go test -c`
-*.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
-go.work
-
-# Build output
-cinema-epg-collector
-main
-
-# IDE files
-.vscode/
+# IDE/Editor
 .idea/
-*.swp
-*.swo
-*~
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+.vscode/
 
 # Logs
 *.log
 logs/
+!logs/.gitkeep
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+# Virtual envs
+.venv/
+venv/
+env/
 
-# Coverage directory used by tools like istanbul
-coverage/
+# OS files
+.DS_Store
+Thumbs.db
 
-# Environment variables
+# Environment
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
-# Docker volumes
-postgres_data/
-redis_data/
+# Caches
+.cache/
+pytest_cache/
+http_cache.sqlite
 
-# Temporary files
-tmp/
-temp/
+# Project data and artifacts
+cache/
+!cache/.gitkeep
 
-# Configuration files with sensitive data
-config.local.yaml
-config.production.yaml
+data/posters/
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
+data/*.json
+!data/.gitkeep
+
+filtered_result.json
+
+# Docker
+*.pid

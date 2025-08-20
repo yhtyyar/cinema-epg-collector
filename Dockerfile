@@ -1,35 +1,22 @@
-# Build stage
-FROM golang:1.21-alpine AS builder
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# Install dependencies
-RUN apk add --no-cache git
+# System deps (optional: libmagic etc.)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy go mod files
-COPY go.mod go.sum ./
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
 
-# Download dependencies
-RUN go mod download
-
-# Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
+EXPOSE 8000
 
-# Final stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates tzdata
-
-WORKDIR /root/
-
-# Copy the binary from builder stage
-COPY --from=builder /app/main .
-
-# Expose port
-EXPOSE 8080
-
-# Run the application
-CMD ["./main"]
+CMD ["uvicorn", "epg_collector.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
