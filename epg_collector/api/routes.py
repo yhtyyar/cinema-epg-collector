@@ -63,17 +63,6 @@ async def list_movies(
     return resp
 
 
-@router.get("/movies/{movie_id}", response_model=Movie)
-async def get_movie(
-    movie_id: str,
-    repo: MoviesRepository = Depends(get_repository),
-) -> Movie:
-    movie = repo.get_by_id(movie_id)
-    if not movie:
-        raise HTTPException(status_code=404, detail="Movie not found")
-    return movie
-
-
 @router.get("/movies/search", response_model=MoviesResponse)
 async def search_movies(
     q: str = Query(..., min_length=1, description="Строка поиска"),
@@ -95,3 +84,14 @@ async def search_movies(
     )
     cache.set(key, resp)
     return resp
+
+
+@router.get("/movies/{movie_id}", response_model=Movie)
+async def get_movie(
+    movie_id: str,
+    repo: MoviesRepository = Depends(get_repository),
+) -> Movie:
+    movie = repo.get_by_id(movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return movie
