@@ -1,6 +1,6 @@
 # IPTV EPG Collector
 
-Модульный профессиональный проект для работы с IPTV EPG данными: загрузка, фильтрация по фильмам (категория "Х/ф"), обогащение данными КиноПоиска и сохранение результатов.
+Модульный профессиональный проект для работы с IPTV EPG данными: загрузка, фильтрация по фильмам (категория "Х/ф"), обогащение и локальная раздача постеров, backend API на FastAPI и современный фронтенд на Vite + React.
 
 ## Возможности
 - Запрос к IPTV EPG API с кастомными заголовками
@@ -12,9 +12,10 @@
 - Логирование в файл и консоль
 - Удобный CLI через Typer
 - Скачивание постеров фильмов в `data/posters/` и добавление локальной ссылки `poster_local` в `enriched_movies.json`
-  - Приоритет источников: Kinopoisk → TMDB → EPG preview
+  - Источник постеров: приоритет TMDB (если доступен `TMDB_API_KEY`), затем Kinopoisk, затем EPG preview
   - Поле `poster_source` фиксирует использованный источник
   - Валидация изображений (Content-Type, магические байты JPG/PNG/WEBP, минимальный размер)
+  - Постеры отдаются фронтенду ТОЛЬКО локально через `/static/posters/...` для надёжной работы без блокировок CDN
 
 ## Структура проекта
 ```
@@ -31,6 +32,7 @@
 │  └─ posters.py
 ├─ data/              # результаты и артефакты (raw_epg.json, movies.json, enriched_movies.json, posters/)
 │  └─ posters/
+├─ frontend/          # Vite + React SPA клиент (dev proxy к бэкенду)
 ├─ cache/             # http_cache.sqlite и кэш КиноПоиска
 ├─ logs/              # app.log
 ├─ .env.example
@@ -55,6 +57,25 @@ python -m epg_collector.cli run-all
 python -m epg_collector.cli fetch-epg-cmd
 python -m epg_collector.cli filter-movies-cmd
 python -m epg_collector.cli enrich
+```
+
+## Frontend (Vite + React)
+
+Локальный запуск фронтенда с проксированием запросов к бэкенду и статике постеров:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+# Откройте http://localhost:5173
+```
+
+Dev-прокси настроен в `frontend/vite.config.ts` на `http://localhost:8000` для путей `/api` и `/static`.
+Продакшн-сборка:
+
+```bash
+cd frontend
+npm run build
 ```
 
 ## Результаты обогащения
@@ -163,3 +184,12 @@ curl "http://localhost:8000/api/movies/search?q=невидимка"
 
 ## Лицензия
 MIT
+
+## Changelog
+
+### v0.2.0
+- Исправлен парсинг EPG: устойчивый JSON-декодинг (`utf-8` → `cp1251` → `latin-1`), защита от не-JSON ответов (капча) с логированием сэмпла
+- Постеры: жёстко локальная раздача через `/static`; понижен минимальный валидный размер до 4KB; проверка магических байт сохранена
+- TMDB как приоритетный источник постеров при наличии `TMDB_API_KEY`; fallback: Kinopoisk → preview
+- Frontend: добавлен dev proxy `/static`, `onError`-фолбэк для битых изображений, декларации типов
+- CI: добавлена задача сборки фронтенда (typecheck + build) на Node 20
