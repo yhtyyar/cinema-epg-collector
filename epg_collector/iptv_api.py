@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, List
+import json
 
 from .config import Config
 
@@ -20,7 +21,29 @@ def fetch_epg(cfg: Config, session) -> List[Dict[str, Any]]:
         headers=cfg.iptv_headers,
     )
     resp.raise_for_status()
-    data = resp.json()
+    # Принудительно используем UTF-8 (некоторые провайдеры выставляют неверную кодировку)
+    try:
+        resp.encoding = "utf-8"
+    except Exception:
+        pass
+    # Надёжный парсинг JSON: сначала пытаемся обычным способом, затем — декодируем байты
+    try:
+        data = resp.json()
+    except ValueError:
+        raw = resp.content or b""
+        last_err = None
+        for enc in ("utf-8", "cp1251", "latin-1"):
+            try:
+                data = json.loads(raw.decode(enc))
+                logger.info("EPG JSON decoded with %s", enc)
+                break
+            except Exception as e:
+                last_err = e
+                data = None
+        if data is None:
+            text_sample = (resp.text or "")[:200]
+            logger.warning("EPG response is not valid JSON after decode attempts. Sample: %r; last_err=%s", text_sample, last_err)
+            return []
 
     if isinstance(data, dict):
         epg = data.get("epg")

@@ -15,7 +15,8 @@ IMAGE_CT_TO_EXT = {
     "image/webp": ".webp",
 }
 
-MIN_VALID_BYTES = 10240  # минимальный размер валидного изображения (~10KB), чтобы отсечь слишком маленькие превью
+# Снижаем порог до ~4KB: некоторые валидные превью могут быть маленькими, но корректными
+MIN_VALID_BYTES = 4096
 
 
 def _looks_like_image_magic(data: bytes) -> bool:

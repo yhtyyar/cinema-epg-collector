@@ -47,3 +47,8 @@ filtered_result.json
 
 # Docker
 *.pid
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/

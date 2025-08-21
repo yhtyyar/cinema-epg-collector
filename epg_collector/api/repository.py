@@ -30,6 +30,8 @@ class MoviesRepository:
         return None
 
     def _poster_url(self, poster_local: Optional[str], kinopoisk: Optional[Dict[str, Any]]) -> Optional[str]:
+        # Возвращаем ТОЛЬКО локально сохранённые постеры, отданные через /static.
+        # Это исключает внешние URL (TMDB/Kinopoisk), которые часто блокируются/не грузятся в браузере.
         if poster_local:
             # Map local file within data/ to /static path so it is served by the API
             # Example: data/posters/xyz.jpg -> /static/posters/xyz.jpg
@@ -38,8 +40,6 @@ class MoviesRepository:
                 relative = norm[len("data/"):]
                 return "/static/" + relative
             return "/static/" + norm
-        if kinopoisk and isinstance(kinopoisk, dict):
-            return kinopoisk.get("poster_url")
         return None
 
     def _normalize(self, item: Dict[str, Any]) -> Movie:

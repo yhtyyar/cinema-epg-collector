@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 import typer
 from rich import print
@@ -72,9 +72,8 @@ def filter_movies_cmd() -> None:
     print(f"[green]Сохранено[/green] {len(movies)} фильмов в {MOVIES_PATH}")
 
 
-@app.command()
-def enrich(limit: int = typer.Option(None, help="Ограничить количество фильмов для обогащения")) -> None:
-    """Обогатить фильмы информацией КиноПоиска и сохранить в data/enriched_movies.json."""
+def _enrich(limit: Optional[int] = None) -> None:
+    """Внутренняя реализация обогащения фильмов."""
     cfg = load_config()
     setup_logging(cfg.log_level)
     session = create_session(cfg)
@@ -102,7 +101,7 @@ def enrich(limit: int = typer.Option(None, help="Ограничить колич
             prev_by_id = {}
 
     enriched: List[Dict[str, Any]] = []
-    for item in track(movies, description="Обогащение КиноПоиском и загрузка постеров"):
+    for item in track(movies, description="Обогащение (TMDB->КиноПоиск) и загрузка постеров"):
         title = item.get("title") or item.get("name")
         # Переиспользование постеров/данных, если ранее уже были сохранены и файл существует
         prev_key = item.get("id") or (item.get("title"), item.get("timestart"))
@@ -119,22 +118,31 @@ def enrich(limit: int = typer.Option(None, help="Ограничить колич
         if not isinstance(title, str) or not title.strip():
             enriched.append({**item, "kinopoisk": None, "poster_local": None})
             continue
-        info = kp.get_movie_info(title)
+        # 1) Пытаемся получить данные из TMDB, 2) если нет — из КиноПоиска
+        tmdb_info = tmdb.get_movie_info(title)
+        info = tmdb_info if tmdb_info else kp.get_movie_info(title)
 
-        # Подбор URL постера: сначала КиноПоиск, затем TMDB, затем превью из EPG
+        # Подбор URL постера: сначала TMDB, затем КиноПоиск, затем превью из EPG
         candidate_urls: List[Dict[str, Any]] = []  # {url, source}
         if isinstance(info, dict):
-            pu = info.get("poster_url")
-            if isinstance(pu, str) and pu.startswith("http"):
-                candidate_urls.append({"url": pu, "source": "kinopoisk"})
-        # TMDB как альтернативный источник (если доступен ключ)
+            # Если инфо из TMDB и содержит постер — приоритет
+            if info.get("source") == "tmdb":
+                pu = info.get("poster_url")
+                if isinstance(pu, str) and pu.startswith("http"):
+                    candidate_urls.append({"url": pu, "source": "tmdb"})
+            # Fallback: для КиноПоиска, если указан постер
+            pu_kp = info.get("poster_url")
+            if isinstance(pu_kp, str) and pu_kp.startswith("http"):
+                candidate_urls.append({"url": pu_kp, "source": "kinopoisk"})
+        # Дополнительный fallback: отдельный запрос к TMDB только за постером (если не нашли выше)
         if tmdb.is_enabled():
-            year = None
+            year_hint = None
             if isinstance(info, dict) and isinstance(info.get("year"), int):
-                year = info.get("year")
-            tmdb_url = tmdb.get_poster_url(title, year=year)
+                year_hint = info.get("year")
+            tmdb_url = tmdb.get_poster_url(title, year=year_hint)
             if isinstance(tmdb_url, str) and tmdb_url.startswith("http"):
                 candidate_urls.append({"url": tmdb_url, "source": "tmdb"})
+        # Последний вариант — превью из EPG
         prev_url = item.get("preview")
         if isinstance(prev_url, str) and prev_url.startswith("http"):
             candidate_urls.append({"url": prev_url, "source": "preview"})
@@ -161,11 +169,17 @@ def enrich(limit: int = typer.Option(None, help="Ограничить колич
 
 
 @app.command()
+def enrich(limit: Optional[int] = typer.Option(None, help="Ограничить количество фильмов для обогащения")) -> None:
+    """CLI-обёртка над _enrich."""
+    _enrich(limit)
+
+
+@app.command()
 def run_all() -> None:
     """Полный цикл: загрузка EPG, фильтрация фильмов, обогащение."""
     fetch_epg_cmd()
     filter_movies_cmd()
-    enrich()
+    _enrich()
 
 
 if __name__ == "__main__":
