@@ -27,7 +27,7 @@ export default function MovieFilters({ initial, onApply, onReset }: Props) {
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-xs mb-1 text-gray-500">Жанр</label>
+        <label className="block text-xs mb-1 text-gray-500">Категория</label>
         <Select value={state.genre ?? ''} onChange={e => setState(s => ({ ...s, genre: e.target.value || undefined }))}>
           <option value="">Любой</option>
           {genres?.map(g => (

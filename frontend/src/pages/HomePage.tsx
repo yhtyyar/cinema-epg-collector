@@ -45,7 +45,7 @@ export default function HomePage() {
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
       <Helmet>
         <title>Фильмы · IPTV Movies</title>
-        <meta name="description" content="Каталог фильмов IPTV: жанры, рейтинг, год, поиск и пагинация" />
+        <meta name="description" content="Каталог фильмов IPTV: категории, рейтинг, год, поиск и пагинация" />
       </Helmet>
 
       <aside className="hidden lg:block">
