@@ -1,5 +1,7 @@
 # IPTV EPG Collector
 
+[![CI](https://github.com/yhtyyar/cinema-epg-collector/actions/workflows/ci.yml/badge.svg)](https://github.com/yhtyyar/cinema-epg-collector/actions/workflows/ci.yml)
+
 Модульный профессиональный проект для работы с IPTV EPG данными: загрузка, фильтрация по фильмам (категория "Х/ф"), обогащение и локальная раздача постеров, backend API на FastAPI и современный фронтенд на Vite + React.
 
 ## Возможности

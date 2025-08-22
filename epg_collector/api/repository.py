@@ -11,13 +11,36 @@ class MoviesRepository:
     def __init__(self, data_path: str = "data/enriched_movies.json") -> None:
         self._path = pathlib.Path(data_path)
         self._raw: List[Dict[str, Any]] = []
+        self._mtime: Optional[float] = None
         self._load()
 
     def _load(self) -> None:
         if not self._path.exists():
             self._raw = []
+            self._mtime = None
             return
         self._raw = json.loads(self._path.read_text(encoding="utf-8"))
+        try:
+            self._mtime = self._path.stat().st_mtime
+        except Exception:
+            # Если не удалось получить mtime, оставляем предыдущее значение
+            pass
+
+    def _reload_if_changed(self) -> None:
+        """Перечитывает данные, если файл обновился."""
+        try:
+            if not self._path.exists():
+                if self._raw:
+                    # Файл удалён — очистим данные
+                    self._raw = []
+                self._mtime = None
+                return
+            current = self._path.stat().st_mtime
+            if self._mtime is None or current != self._mtime:
+                self._load()
+        except Exception:
+            # Никогда не падаем из‑за ошибок перезагрузки
+            pass
 
     def _to_iso(self, val: Optional[str], epoch: Optional[int]) -> Optional[str]:
         if val:
@@ -100,6 +123,7 @@ class MoviesRepository:
         )
 
     def get_by_id(self, movie_id: str) -> Optional[Movie]:
+        self._reload_if_changed()
         for it in self._raw:
             if str(it.get("id")) == str(movie_id):
                 return self._normalize(it)
@@ -119,6 +143,7 @@ class MoviesRepository:
 
         Если указан search_q, выполняется поиск по epg.title и kinopoisk.name.
         """
+        self._reload_if_changed()
         data = self._raw
 
         # Фильтры

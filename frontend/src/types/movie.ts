@@ -10,6 +10,9 @@ export type Movie = {
   duration?: number
   genres?: Genre[]
   poster_url?: string
+  // Доп. метаданные из backend
+  source?: string
+  broadcast_time?: string
 }
 
 export type PagedResponse<T> = {

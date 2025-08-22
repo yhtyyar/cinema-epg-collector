@@ -16,7 +16,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      <footer className="border-t border-gray-200/10 py-6 text-center text-sm text-gray-500">
+      <footer className="border-t border-gray-200 dark:border-white/10 py-6 text-center text-sm text-gray-500">
         IPTV Movies · © {new Date().getFullYear()}
       </footer>
     </div>

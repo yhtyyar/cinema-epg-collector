@@ -52,3 +52,14 @@ filtered_result.json
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/tsconfig.tsbuildinfo
+
+# Android
+android-app/.gradle/
+android-app/local.properties
+android-app/**/build/
+android-app/**/captures/
+android-app/**/*.iml
+android-app/*.keystore
+android-app/*.jks
+*.apk

@@ -32,6 +32,8 @@ function adaptMovie(dto: any): Movie {
   const duration = kp.duration ?? undefined
   const genresSrc: string[] = Array.isArray(kp.genres) ? kp.genres : []
   const genres: Genre[] = genresSrc.map((name, idx) => ({ id: idx + 1, name }))
+  const source: string | undefined = dto?.metadata?.source || undefined
+  const broadcast_time: string | undefined = epg?.broadcast_time || undefined
   return {
     id: String(dto?.id ?? ''),
     title,
@@ -42,6 +44,8 @@ function adaptMovie(dto: any): Movie {
     duration,
     genres,
     poster_url,
+    source,
+    broadcast_time,
   }
 }
 

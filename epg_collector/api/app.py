@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import List
@@ -11,7 +12,7 @@ from fastapi.responses import JSONResponse
 from starlette.staticfiles import StaticFiles
 
 from epg_collector.api.routes import router as movies_router
-from epg_collector.api.dependencies import get_settings
+from epg_collector.api.dependencies import get_settings, get_cache
 
 
 def create_app() -> FastAPI:
@@ -63,6 +64,31 @@ def create_app() -> FastAPI:
     @app.get("/healthz")
     async def healthz():
         return {"status": "ok"}
+
+    # Optional: auto-run data pipeline on startup (in background)
+    async def _run_pipeline_bg() -> None:
+        try:
+            # Import locally to avoid circular deps on app import
+            from epg_collector.cli import run_all as run_pipeline
+
+            # Run sync pipeline without blocking the event loop
+            await asyncio.to_thread(run_pipeline)
+            logger.info("Data pipeline completed successfully")
+        except Exception as exc:
+            logger.exception("Data pipeline failed: %s", exc)
+        finally:
+            try:
+                cache = get_cache(settings)
+                cache.clear()
+                logger.info("API cache cleared after pipeline")
+            except Exception as e:
+                logger.exception("Failed to clear API cache after pipeline: %s", e)
+
+    @app.on_event("startup")
+    async def _schedule_pipeline_on_startup() -> None:
+        if settings.auto_run_pipeline:
+            logger.info("AUTO_RUN_PIPELINE is enabled; scheduling pipeline on startup")
+            asyncio.create_task(_run_pipeline_bg())
 
     return app
 

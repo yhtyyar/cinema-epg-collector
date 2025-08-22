@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: { light: '#ffffff', dark: '#0f1115' },
-        fg: { light: '#0f1115', dark: '#e5e7eb' },
+        bg: { light: '#f8fafc', dark: '#0f1115' },
+        fg: { light: '#0f172a', dark: '#e5e7eb' },
         accent: { DEFAULT: '#7c3aed' }
       },
       boxShadow: {

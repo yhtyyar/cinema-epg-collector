@@ -5,7 +5,7 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="inline-flex items-center gap-2 rounded-md border border-gray-200/10 px-3 py-2 text-sm hover:bg-gray-100/50 dark:hover:bg-white/5 transition"
+      className="inline-flex items-center gap-2 rounded-md border border-gray-300 dark:border-white/10 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-white/5 transition"
       aria-label="Переключить тему"
       title="Переключить тему"
     >

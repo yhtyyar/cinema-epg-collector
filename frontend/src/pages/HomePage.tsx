@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { useSearchParams } from 'react-router-dom'
 import { useMovies } from '../hooks/useMovies'
-import MovieGrid from '../components/movies/MovieGrid'
+import MovieSections from '../components/movies/MovieSections'
 import MovieFilters, { Filters } from '../components/movies/MovieFilters'
 import ErrorMessage from '../components/common/ErrorMessage'
 import Pagination from '../components/ui/Pagination'
@@ -49,7 +49,7 @@ export default function HomePage() {
       </Helmet>
 
       <aside className="hidden lg:block">
-        <div className="sticky top-[72px] rounded-lg border border-gray-200/10 p-4 bg-white/50 dark:bg-white/5">
+        <div className="sticky top-[72px] rounded-lg border border-gray-200 p-4 bg-white dark:bg-white/5">
           <h2 className="font-semibold mb-3">Фильтры</h2>
           <MovieFilters
             initial={{ genre, year, rating }}
@@ -63,7 +63,7 @@ export default function HomePage() {
         {/* Мобильные фильтры кнопка */}
         <div className="lg:hidden flex justify-end">
           <button
-            className="rounded-md border border-gray-200/10 px-3 py-2 text-sm hover:bg-gray-100/60 dark:hover:bg-white/10"
+            className="rounded-md border border-gray-300 dark:border-white/10 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-white/10"
             onClick={() => setMobileFiltersOpen(true)}
             aria-label="Открыть фильтры"
           >
@@ -75,7 +75,7 @@ export default function HomePage() {
         {isError && <ErrorMessage message={(error as Error)?.message} />}
         {data && (
           <>
-            <MovieGrid movies={data.items} />
+            <MovieSections movies={data.items} />
             <div className="flex items-center justify-center pt-4">
               <Pagination page={page} pages={totalPages} onChange={(p) => update('page', String(p))} />
             </div>

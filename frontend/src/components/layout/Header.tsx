@@ -15,7 +15,7 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-black/30 bg-white/80 dark:bg-black/40 border-b border-gray-200/10">
+    <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-black/30 bg-white/80 dark:bg-black/40 border-b border-gray-200 dark:border-white/10">
       <div className="container-responsive flex items-center gap-4 py-3">
         <Link to="/" className="font-semibold tracking-tight text-xl">
           IPTV<span className="text-accent">Movies</span>

@@ -20,7 +20,7 @@ export default function Modal({ open, title, onClose, children }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal>
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-lg border border-gray-200/10 bg-white/90 dark:bg-gray-900/90 backdrop-blur p-4">
+      <div className="relative w-full max-w-md rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/90 backdrop-blur p-4">
         {title && <h3 className="text-lg font-semibold mb-3">{title}</h3>}
         {children}
         <div className="mt-4 text-right">

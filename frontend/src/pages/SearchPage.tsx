@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useMovies } from '../hooks/useMovies'
-import MovieGrid from '../components/movies/MovieGrid'
+import MovieSections from '../components/movies/MovieSections'
 import ErrorMessage from '../components/common/ErrorMessage'
 import { SkeletonGrid } from '../components/common/Skeletons'
 import Pagination from '../components/ui/Pagination'
@@ -35,7 +35,7 @@ export default function SearchPage() {
       {isError && <ErrorMessage message={(error as Error)?.message} />}
       {data && (
         <>
-          <MovieGrid movies={data.items} />
+          <MovieSections movies={data.items} />
           <div className="flex items-center justify-center pt-4">
             <Pagination page={page} pages={totalPages} onChange={updatePage} />
           </div>
