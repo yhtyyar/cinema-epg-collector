@@ -13,6 +13,12 @@ class Config:
     iptv_params: Dict[str, str]
     iptv_headers: Dict[str, str]
 
+    # Playlist
+    playlist_base_url: str
+    playlist_params: Dict[str, str]
+    playlist_headers: Dict[str, str]
+    playlist_form: Dict[str, str]
+
     # HTTP
     http_timeout: int = 30
     http_retries: int = 3
@@ -65,6 +71,33 @@ def load_config() -> Config:
         "x-token": os.getenv("IPTV_HEADER_X_TOKEN", ""),
     }
 
+    # Playlist API (POST form-urlencoded)
+    playlist_base_url = os.getenv("PLAYLIST_BASE_URL", "https://pl.iptv2021.com/api/v4/playlist")
+    playlist_params = {
+        "tz": os.getenv("PLAYLIST_PARAMS_TZ", "3"),
+        "region": os.getenv("PLAYLIST_PARAMS_REGION", "0"),
+        "native_region_only": os.getenv("PLAYLIST_PARAMS_NATIVE_REGION_ONLY", "1"),
+        "limit": os.getenv("PLAYLIST_PARAMS_LIMIT", "0"),
+        "page": os.getenv("PLAYLIST_PARAMS_PAGE", "1"),
+        "epg": os.getenv("PLAYLIST_PARAMS_EPG", "0"),
+        "installts": os.getenv("PLAYLIST_PARAMS_INSTALLTS", ""),
+        "needCategories": os.getenv("PLAYLIST_PARAMS_NEED_CATEGORIES", "1"),
+        "podcasts": os.getenv("PLAYLIST_PARAMS_PODCASTS", "1"),
+    }
+    # По умолчанию используем те же значения, что и для IPTV, если специальные не заданы
+    playlist_headers = {
+        "Host": os.getenv("PLAYLIST_HEADER_HOST", os.getenv("IPTV_HEADER_HOST", "pl.iptv2021.com")),
+        "User-Agent": os.getenv("PLAYLIST_HEADER_UA", os.getenv("IPTV_HEADER_UA", "Mozilla/5.0")),
+        "x-lhd-agent": os.getenv("PLAYLIST_HEADER_X_LHD_AGENT", os.getenv("IPTV_HEADER_X_LHD_AGENT", "")),
+        "x-token": os.getenv("PLAYLIST_HEADER_X_TOKEN", os.getenv("IPTV_HEADER_X_TOKEN", "")),
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    playlist_form = {
+        "subs_packs": os.getenv("PLAYLIST_FORM_SUBS_PACKS", "[]"),
+        "y_subs_packs": os.getenv("PLAYLIST_FORM_Y_SUBS_PACKS", "[]"),
+        "payload": os.getenv("PLAYLIST_FORM_PAYLOAD", ""),
+    }
+
     http_timeout = int(os.getenv("HTTP_TIMEOUT", 30))
     http_retries = int(os.getenv("HTTP_RETRIES", 3))
     http_backoff = float(os.getenv("HTTP_BACKOFF", 0.5))
@@ -94,6 +127,10 @@ def load_config() -> Config:
         iptv_base_url=iptv_base_url,
         iptv_params=iptv_params,
         iptv_headers=iptv_headers,
+        playlist_base_url=playlist_base_url,
+        playlist_params=playlist_params,
+        playlist_headers=playlist_headers,
+        playlist_form=playlist_form,
         http_timeout=http_timeout,
         http_retries=http_retries,
         http_backoff=http_backoff,

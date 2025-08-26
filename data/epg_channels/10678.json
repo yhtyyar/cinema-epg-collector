@@ -1,0 +1,32 @@
+{
+  "our_id": "10678",
+  "epg": [
+    {
+      "date": "26.08.2025",
+      "title": "Сегодня",
+      "data": [
+        {
+          "id": 0,
+          "epg_id": 111253,
+          "timestart": 1756155600,
+          "timestop": 1756242000,
+          "title": "Телепрограмма отсутствует",
+          "desc": "",
+          "cdnvideo": 0,
+          "rating": null,
+          "video_url": "",
+          "vod_id": 0,
+          "sub_title": "",
+          "season": 0,
+          "category": "",
+          "genre": "",
+          "mskdatetimestart": "2025-08-26 00:00:00",
+          "usrdatetimestart": "2025-08-26 00:00:00",
+          "ddiff": 0,
+          "preview": ""
+        }
+      ],
+      "current": true
+    }
+  ]
+}
