@@ -1,0 +1,16 @@
+# Dockerfile для разработки frontend
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Устанавливаем зависимости
+COPY package*.json ./
+RUN npm ci
+
+# Копируем исходный код
+COPY . .
+
+EXPOSE 5173
+
+# Запускаем dev server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

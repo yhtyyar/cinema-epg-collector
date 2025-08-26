@@ -5,24 +5,42 @@ import logging
 import time
 from typing import List
 
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-from starlette.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
+import time
+import logging
+import json
 
+from epg_collector.config import Config
 from epg_collector.api.routes import router as movies_router
 from epg_collector.api.dependencies import get_settings, get_cache
+from epg_collector.logging_config import setup_logging
 
+# Настройка логирования
+setup_logging()
+logger = logging.getLogger(__name__)
 
 def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
         title="Cinema EPG Collector API",
-        version="0.1.0",
         description="REST API для доступа к объединённым данным фильмов из EPG/КиноПоиск",
+        version="0.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
     )
+
+    # Middleware для правильной кодировки UTF-8
+    @app.middleware("http")
+    async def add_utf8_header(request: Request, call_next):
+        response = await call_next(request)
+        if response.headers.get("content-type", "").startswith("application/json"):
+            response.headers["content-type"] = "application/json; charset=utf-8"
+        return response
 
     # CORS
     origins: List[str] = settings.api_cors_origins or ["*"]

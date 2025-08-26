@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Backend для разработки
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cinema-epg-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Базовые настройки для разработки
+      - LOG_LEVEL=DEBUG
+      - AUTO_RUN_PIPELINE=false
+      - CACHE_ENABLED=true
+      - API_CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      
+      # IPTV API (используйте свои данные)
+      - IPTV_BASE_URL=https://pl.iptv2021.com/api/v4/epg
+      - IPTV_PARAMS_ID=126
+      - IPTV_HEADER_HOST=pl.iptv2021.com
+      - IPTV_HEADER_UA=Mozilla/5.0 (Linux; Android 11; SM-A127F) AppleWebKit/537.36
+      
+      # Опциональные API ключи (замените на свои)
+      - KINOPOISK_API_KEY=${KINOPOISK_API_KEY:-}
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+    networks:
+      - cinema-network
+    command: uvicorn epg_collector.api.app:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend для разработки (Vite dev server)
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: cinema-epg-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_PROXY_TARGET=http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - cinema-network
+    command: npm run dev -- --host 0.0.0.0
+
+networks:
+  cinema-network:
+    driver: bridge

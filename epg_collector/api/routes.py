@@ -4,8 +4,10 @@ import math
 from typing import Optional, List
 from pathlib import Path
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 
 from epg_collector.api.models import (
     MoviesResponse,
@@ -20,7 +22,8 @@ from epg_collector.api.repository import MoviesRepository
 from epg_collector.api.cache import TTLCache
 from epg_collector.config import Config
 
-router = APIRouter(prefix="/api", tags=["movies"])
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api", tags=["api"])
 
 
 def _cache_key(path: str, **params) -> str:
@@ -106,8 +109,9 @@ async def get_movie(
     return movie
 
 
-# --- Channels (per-channel JSON) ---
+# --- Data directories ---
 
+MOVIES_DIR = Path("data")
 CHANNEL_MOVIES_DIR = Path("data/channel_json/movies")
 CHANNEL_CARTOONS_DIR = Path("data/channel_json/cartoons")
 
@@ -116,15 +120,27 @@ def _list_channels_from_dir(directory: Path) -> List[ChannelItem]:
     channels: List[ChannelItem] = []
     if not directory.exists():
         return channels
+    
     for p in sorted(directory.glob("*.json")):
         try:
-            obj = json.loads(p.read_text(encoding="utf-8"))
+            # Читаем файл с правильной кодировкой
+            content = p.read_text(encoding="utf-8")
+            obj = json.loads(content)
+            
+            # Безопасное извлечение данных
             cid = str(obj.get("our_id") or p.stem)
-            cnt = int(obj.get("count") or (len(obj.get("items", [])) if isinstance(obj.get("items"), list) else 0))
+            items = obj.get("items", [])
+            cnt = int(obj.get("count") or (len(items) if isinstance(items, list) else 0))
+            
             channels.append(ChannelItem(id=cid, count=cnt))
-        except Exception:
-            # Пропускаем битые файлы
+            
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.warning(f"Failed to parse channel file {p}: {e}")
             continue
+        except Exception as e:
+            logger.error(f"Unexpected error reading channel file {p}: {e}")
+            continue
+            
     return channels
 
 
@@ -156,13 +172,28 @@ def _read_channel_file(directory: Path, channel_id: str) -> ChannelData:
     path = directory / f"{channel_id}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Channel not found")
+    
     try:
-        obj = json.loads(path.read_text(encoding="utf-8"))
-        # Валидация через модель
+        # Читаем файл с правильной кодировкой
+        content = path.read_text(encoding="utf-8")
+        obj = json.loads(content)
+        
+        # Валидация через модель с улучшенной обработкой ошибок
         return ChannelData(**obj)
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error for channel {channel_id}: {e}")
+        raise HTTPException(status_code=500, detail="Invalid JSON format in channel data")
+    except UnicodeDecodeError as e:
+        logger.error(f"Unicode decode error for channel {channel_id}: {e}")
+        raise HTTPException(status_code=500, detail="Encoding error in channel data")
+    except ValueError as e:
+        logger.error(f"Validation error for channel {channel_id}: {e}")
+        raise HTTPException(status_code=500, detail="Invalid data format in channel")
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        logger.error(f"Unexpected error reading channel {channel_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to read channel data")
 
 
@@ -186,3 +217,121 @@ async def get_channel_cartoons(channel_id: str, cache: TTLCache = Depends(get_ca
     data = _read_channel_file(CHANNEL_CARTOONS_DIR, channel_id)
     cache.set(key, data)
     return data
+
+
+# Добавляем общий эндпоинт для каналов (для совместимости с frontend)
+@router.get("/channels", response_model=dict)
+async def list_all_channels(cache: TTLCache = Depends(get_cache)) -> dict:
+    """Возвращает все доступные каналы (фильмы и мультфильмы)"""
+    key = _cache_key("/api/channels")
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    
+    try:
+        movies_channels = _list_channels_from_dir(CHANNEL_MOVIES_DIR)
+        cartoons_channels = _list_channels_from_dir(CHANNEL_CARTOONS_DIR)
+        
+        result = {
+            "movies": movies_channels,
+            "cartoons": cartoons_channels,
+            "total": len(movies_channels) + len(cartoons_channels)
+        }
+        
+        cache.set(key, result)
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching channels: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch channels")
+
+
+# Добавляем health check эндпоинт
+@router.get("/health")
+async def health_check():
+    """Health check эндпоинт для мониторинга"""
+    return JSONResponse(
+        content={"status": "healthy", "service": "cinema-epg-collector-api"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+
+
+@router.get("/genres", response_model=dict)
+async def list_genres(cache: TTLCache = Depends(get_cache)) -> dict:
+    """Получение списка всех жанров"""
+    key = _cache_key("/api/genres")
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    
+    try:
+        genres = set()
+        
+        # Собираем жанры из основных файлов с фильмами
+        movie_files = ["epg_movies.json", "epg_cartoons.json", "movies.json", "enriched_movies.json"]
+        
+        for filename in movie_files:
+            file_path = MOVIES_DIR / filename
+            if file_path.exists():
+                try:
+                    data = _read_json_file(file_path)
+                    if isinstance(data, list):
+                        for movie in data:
+                            if isinstance(movie, dict) and "epg_data" in movie:
+                                epg_data = movie["epg_data"]
+                                if isinstance(epg_data, dict) and "genre" in epg_data:
+                                    genre = epg_data["genre"]
+                                    if isinstance(genre, str) and genre.strip():
+                                        # Разделяем жанры по запятым и добавляем каждый
+                                        for g in genre.split(","):
+                                            g = g.strip()
+                                            if g:
+                                                genres.add(g)
+                except Exception as e:
+                    logger.warning(f"Error reading {file_path}: {e}")
+        
+        result = {"genres": sorted(list(genres))}
+        cache.set(key, result)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting genres: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get genres")
+
+
+@router.get("/stats", response_model=dict)
+async def get_stats(cache: TTLCache = Depends(get_cache)) -> dict:
+    """Получение статистики по фильмам и каналам"""
+    key = _cache_key("/api/stats")
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    
+    try:
+        # Подсчет общего количества фильмов
+        total_movies = 0
+        total_channels = 0
+        
+        # Подсчет фильмов
+        for file_path in MOVIES_DIR.glob("*.json"):
+            try:
+                data = _read_json_file(file_path)
+                if isinstance(data, list):
+                    total_movies += len(data)
+            except Exception as e:
+                logger.warning(f"Error reading {file_path}: {e}")
+        
+        # Подсчет каналов
+        total_channels += len(list(CHANNEL_MOVIES_DIR.glob("*.json")))
+        total_channels += len(list(CHANNEL_CARTOONS_DIR.glob("*.json")))
+        
+        result = {
+            "total_movies": total_movies,
+            "total_channels": total_channels,
+            "movies_channels": len(list(CHANNEL_MOVIES_DIR.glob("*.json"))),
+            "cartoons_channels": len(list(CHANNEL_CARTOONS_DIR.glob("*.json")))
+        }
+        
+        cache.set(key, result)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting statistics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get statistics")

@@ -1,0 +1,129 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cinema-epg-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # IPTV API настройки
+      - IPTV_BASE_URL=https://pl.iptv2021.com/api/v4/epg
+      - IPTV_PARAMS_ID=126
+      - IPTV_PARAMS_TZ=3
+      - IPTV_PARAMS_EPG_FROM=-7
+      - IPTV_PARAMS_EPG_LIMIT=14
+      - IPTV_PARAMS_GROUPING=1
+      - IPTV_PARAMS_REGION=0
+      - IPTV_PARAMS_LANG=ru
+      
+      # Заголовки IPTV
+      - IPTV_HEADER_HOST=pl.iptv2021.com
+      - IPTV_HEADER_UA=Mozilla/5.0 (Linux; Android 11; SM-A127F) AppleWebKit/537.36
+      - IPTV_HEADER_X_LHD_AGENT={"generation":2,"sdk":30,"version_name":"5.7.12","version_code":851,"platform":"android","device_id":"YOUR_DEVICE_ID","name":"samsung+SM-A127F","app":"com.infolink.limeiptv"}
+      - IPTV_HEADER_X_TOKEN=0a17dbac5958fbf1d31a351386802afe
+      
+      # Playlist API
+      - PLAYLIST_BASE_URL=https://pl.iptv2021.com/api/v4/playlist
+      - PLAYLIST_PARAMS_TZ=3
+      - PLAYLIST_PARAMS_REGION=0
+      - PLAYLIST_PARAMS_NATIVE_REGION_ONLY=1
+      - PLAYLIST_PARAMS_LIMIT=0
+      - PLAYLIST_PARAMS_PAGE=1
+      - PLAYLIST_PARAMS_EPG=0
+      - PLAYLIST_PARAMS_INSTALLTS=
+      - PLAYLIST_PARAMS_NEED_CATEGORIES=1
+      - PLAYLIST_PARAMS_PODCASTS=1
+      
+      # HTTP настройки
+      - HTTP_TIMEOUT=30
+      - HTTP_RETRIES=3
+      - HTTP_BACKOFF=0.5
+      
+      # Кэш
+      - CACHE_ENABLED=true
+      - CACHE_PATH=cache/http_cache
+      - CACHE_EXPIRE=3600
+      
+      # API настройки
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_CACHE_TTL=300
+      - API_CORS_ORIGINS=*
+      
+      # Логирование
+      - LOG_LEVEL=INFO
+      
+      # Pipeline
+      - AUTO_RUN_PIPELINE=false
+      
+      # КиноПоиск API (опционально - замените на свой ключ)
+      - KINOPOISK_API_KEY=596756ae-256d-4861-89db-b0e67f931fe3
+      - KINOPOISK_BASE_URL=https://api.kinopoisk.dev/v1.4
+      
+      # TMDB API (опционально - замените на свой ключ)
+      - TMDB_API_KEY=35518ecf03864aa2829c0585408346c9
+      - TMDB_BASE_URL=https://api.themoviedb.org/3
+      - TMDB_IMAGE_BASE=https://image.tmdb.org/t/p/w500
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+    networks:
+      - cinema-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cinema-epg-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - cinema-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis для кэширования (опционально)
+  redis:
+    image: redis:7-alpine
+    container_name: cinema-epg-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cinema-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  cinema-network:
+    driver: bridge
