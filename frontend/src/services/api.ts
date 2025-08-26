@@ -1,6 +1,8 @@
 import axios from 'axios'
 import type { Genre, Movie, PagedResponse } from '../types/movie'
 
+import type { ChannelItem, ChannelsResponse, ChannelData } from '../types/channel'
+
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
 export const api = axios.create({
@@ -92,4 +94,18 @@ export async function fetchGenres(signal?: AbortSignal) {
     // Фолбэк: пустой список
     return []
   }
+}
+
+// --- Channels (per-channel JSON) ---
+export async function fetchMovieChannels(kind: 'movies' | 'cartoons', signal?: AbortSignal) {
+  const path = kind === 'movies' ? '/channels/movies' : '/channels/cartoons'
+  const { data } = await api.get<ChannelsResponse>(path, { signal })
+  const channels: ChannelItem[] = Array.isArray((data as any)?.channels) ? (data as any).channels : []
+  return channels
+}
+
+export async function fetchChannelData(kind: 'movies' | 'cartoons', channelId: string, signal?: AbortSignal) {
+  const path = kind === 'movies' ? `/channels/movies/${channelId}` : `/channels/cartoons/${channelId}`
+  const { data } = await api.get<ChannelData>(path, { signal })
+  return data
 }

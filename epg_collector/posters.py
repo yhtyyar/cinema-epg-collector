@@ -74,7 +74,16 @@ def _guess_ext(url: str, content_type: Optional[str]) -> str:
     return ".jpg"
 
 
-def download_poster(session: requests.Session, url: str, posters_dir: Path, *, title: str, epg_id: Optional[int]) -> Optional[str]:
+def download_poster(
+    session: requests.Session,
+    url: str,
+    posters_dir: Path,
+    *,
+    title: str,
+    epg_id: Optional[int],
+    year: Optional[int] = None,
+    source: Optional[str] = None,
+) -> Optional[str]:
     """Скачать постер и вернуть относительный путь (str) или None при ошибке.
 
     Имя файла строится из epg_id + slug(title). Повторные скачивания избегаются, если файл уже существует.
@@ -86,6 +95,10 @@ def download_poster(session: requests.Session, url: str, posters_dir: Path, *, t
 
         # Если файл уже существует с любой известной графической экстеншн — вернём его без сети
         base = f"{id_part}-{slug}"
+        if isinstance(year, int):
+            base = f"{base}-{year}"
+        if isinstance(source, str) and source:
+            base = f"{base}-{_slugify(source)}"
         for ext in (".jpg", ".png", ".webp"):
             existing = posters_dir / f"{base}{ext}"
             if existing.exists():

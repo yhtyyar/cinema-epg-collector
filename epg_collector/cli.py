@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+import time
+from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import typer
 from rich import print
@@ -36,6 +39,19 @@ EPG_MOVIES_PATH = DATA_DIR / "epg_movies.json"
 EPG_CARTOONS_DIR = DATA_DIR / "epg_channels_cartoons"
 EPG_CARTOONS_DIR.mkdir(parents=True, exist_ok=True)
 EPG_CARTOONS_PATH = DATA_DIR / "epg_cartoons.json"
+POSTERS_MOVIES_DIR = POSTERS_DIR / "movies"
+POSTERS_CARTOONS_DIR = POSTERS_DIR / "cartoons"
+EPG_MOVIES_POSTERS_PATH = DATA_DIR / "epg_movies_posters.json"
+EPG_CARTOONS_POSTERS_PATH = DATA_DIR / "epg_cartoons_posters.json"
+EPG_MOVIES_POSTERS_SKIPPED_PATH = DATA_DIR / "epg_movies_posters_skipped.json"
+EPG_CARTOONS_POSTERS_SKIPPED_PATH = DATA_DIR / "epg_cartoons_posters_skipped.json"
+
+# Per-channel enriched JSON output
+CHANNEL_JSON_DIR = DATA_DIR / "channel_json"
+CHANNEL_MOVIES_DIR = CHANNEL_JSON_DIR / "movies"
+CHANNEL_CARTOONS_DIR = CHANNEL_JSON_DIR / "cartoons"
+CHANNEL_MOVIES_DIR.mkdir(parents=True, exist_ok=True)
+CHANNEL_CARTOONS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.command()
@@ -73,6 +89,27 @@ def fetch_playlist_cmd() -> None:
     except Exception:
         size = 0
     print(f"[green]Сохранено[/green] {size} элементов (если применимо) в {RAW_PLAYLIST_PATH}")
+
+
+def _compute_year_from_ts(ts: Any) -> Optional[int]:
+    """Безопасно получить год из Unix timestamp в UTC."""
+    try:
+        if isinstance(ts, (int, float)) and ts > 0:
+            return datetime.fromtimestamp(int(ts), tz=timezone.utc).year
+    except Exception:
+        return None
+
+
+def _static_url_from_local(local_path: Optional[str]) -> Optional[str]:
+    """Преобразует путь в пределах data/ к URL /static для отдачи через API."""
+    if not local_path:
+        return None
+    norm = str(local_path).replace("\\", "/")
+    if norm.startswith("data/"):
+        relative = norm[len("data/"):]
+        return "/static/" + relative
+    return "/static/" + norm
+    return None
 
 
 def _extract_channel_ids_from_playlist(obj: Any) -> List[str]:
@@ -370,6 +407,417 @@ def filter_epg_cartoons(
     EPG_CARTOONS_PATH.write_text(json.dumps(aggregated, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[green]Готово[/green]: обработано {processed} файлов, сохранено {saved} в {EPG_CARTOONS_DIR}; агрегировано {len(aggregated)} элементов в {EPG_CARTOONS_PATH}")
 
+
+@app.command()
+def download_posters_epg_movies(
+    limit_per_channel: Optional[int] = typer.Option(None, help="Ограничить количество элементов на канал для скачивания постеров"),
+    workers: int = typer.Option(6, help="Количество параллельно обрабатываемых файлов каналов"),
+) -> None:
+    """Скачать постеры из TMDB для отфильтрованных фильмов по каждому каналу.
+
+    - Источник: data/epg_channels_filtered/*.movies.json
+    - Сохранение: data/posters/movies/{our_id}/<id>-<slug(title)>.<ext>
+    - Агрегация: data/epg_movies_posters.json
+    """
+    cfg = load_config()
+    setup_logging(cfg.log_level)
+    session = create_session(cfg)
+    tmdb = TMDBClient(cfg, session)
+
+    if not tmdb.is_enabled():
+        print("[yellow]TMDB не настроен. Укажите TMDB_API_KEY в .env[/yellow]")
+        raise typer.Exit(code=1)
+
+    if not EPG_FILTERED_DIR.exists():
+        print(f"[yellow]{EPG_FILTERED_DIR} не найден. Сначала выполните filter-epg-movies[/yellow]")
+        raise typer.Exit(code=1)
+
+    files = sorted([p for p in EPG_FILTERED_DIR.glob("*.movies.json") if p.is_file()])
+    if not files:
+        print(f"[yellow]Нет файлов фильмов в {EPG_FILTERED_DIR}[/yellow]")
+        raise typer.Exit(code=1)
+
+    mapped: List[Dict[str, Any]] = []
+    skipped: List[Dict[str, Any]] = []
+    total_saved = 0
+
+    def process_file(p: Path) -> Dict[str, Any]:
+        local_session = create_session(cfg)
+        local_tmdb = TMDBClient(cfg, local_session)
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:
+            return {"mapped": [], "saved": 0, "skipped": [{"file": p.name, "reason": f"read_error: {e}"}]}
+        our_id = str(obj.get("our_id") or p.stem.replace(".movies", ""))
+        items = obj.get("epg")
+        if not isinstance(items, list):
+            return {"mapped": [], "saved": 0, "skipped": [{"our_id": our_id, "reason": "no_epg_list"}]}
+        if limit_per_channel is not None:
+            items = items[:limit_per_channel]
+        posters_dir = POSTERS_MOVIES_DIR / our_id
+        loc_mapped: List[Dict[str, Any]] = []
+        loc_skipped: List[Dict[str, Any]] = []
+        saved = 0
+        for it in items:
+            if not isinstance(it, dict):
+                loc_skipped.append({"our_id": our_id, "id": None, "reason": "invalid_item"})
+                continue
+            title = it.get("title") or it.get("name")
+            if not isinstance(title, str) or not title.strip():
+                loc_skipped.append({"our_id": our_id, "id": it.get("id"), "reason": "no_title"})
+                continue
+            year = _compute_year_from_ts(it.get("timestart"))
+            # Ретраи получения URL постера
+            url = None
+            for attempt in range(3):
+                try:
+                    url = local_tmdb.get_poster_url(title, year=year)
+                    if isinstance(url, str) and url.startswith("http"):
+                        break
+                except Exception:
+                    url = None
+                time.sleep(0.4 * (attempt + 1))
+            if not isinstance(url, str) or not url.startswith("http"):
+                loc_skipped.append({"our_id": our_id, "id": it.get("id"), "title": title, "reason": "no_tmdb_url"})
+                continue
+            local = download_poster(local_session, url, posters_dir, title=title, epg_id=it.get("id"), year=year, source="tmdb")
+            if local:
+                saved += 1
+                loc_mapped.append({
+                    "our_id": our_id,
+                    "id": it.get("id"),
+                    "title": title,
+                    "year": year,
+                    "timestart": it.get("timestart"),
+                    "timestop": it.get("timestop"),
+                    "poster_url": url,
+                    "poster_local": local,
+                    "source": "tmdb",
+                })
+            else:
+                loc_skipped.append({"our_id": our_id, "id": it.get("id"), "title": title, "reason": "download_failed", "poster_url": url})
+        return {"mapped": loc_mapped, "saved": saved, "skipped": loc_skipped}
+
+    with ThreadPoolExecutor(max_workers=max(1, int(workers))) as ex:
+        futures = {ex.submit(process_file, p): p for p in files}
+        for fut in track(as_completed(futures), description="Скачивание постеров (фильмы)", total=len(futures)):
+            res = fut.result()
+            mapped.extend(res.get("mapped", []))
+            total_saved += int(res.get("saved", 0))
+            skipped.extend(res.get("skipped", []))
+
+    EPG_MOVIES_POSTERS_PATH.write_text(json.dumps(mapped, ensure_ascii=False, indent=2), encoding="utf-8")
+    EPG_MOVIES_POSTERS_SKIPPED_PATH.write_text(json.dumps(skipped, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[green]Готово[/green]: скачано {total_saved} постеров. Маппинг: {EPG_MOVIES_POSTERS_PATH}. Пропуски: {len(skipped)} → {EPG_MOVIES_POSTERS_SKIPPED_PATH}")
+
+
+@app.command()
+def download_posters_epg_cartoons(
+    limit_per_channel: Optional[int] = typer.Option(None, help="Ограничить количество элементов на канал для скачивания постеров"),
+    workers: int = typer.Option(6, help="Количество параллельно обрабатываемых файлов каналов"),
+) -> None:
+    """Скачать постеры из TMDB для отфильтрованных мультфильмов по каждому каналу.
+
+    - Источник: data/epg_channels_cartoons/*.cartoons.json
+    - Сохранение: data/posters/cartoons/{our_id}/<id>-<slug(title)>.<ext>
+    - Агрегация: data/epg_cartoons_posters.json
+    """
+    cfg = load_config()
+    setup_logging(cfg.log_level)
+    session = create_session(cfg)
+    tmdb = TMDBClient(cfg, session)
+
+    if not tmdb.is_enabled():
+        print("[yellow]TMDB не настроен. Укажите TMDB_API_KEY в .env[/yellow]")
+        raise typer.Exit(code=1)
+
+    if not EPG_CARTOONS_DIR.exists():
+        print(f"[yellow]{EPG_CARTOONS_DIR} не найден. Сначала выполните filter-epg-cartoons[/yellow]")
+        raise typer.Exit(code=1)
+
+    files = sorted([p for p in EPG_CARTOONS_DIR.glob("*.cartoons.json") if p.is_file()])
+    if not files:
+        print(f"[yellow]Нет файлов мультфильмов в {EPG_CARTOONS_DIR}[/yellow]")
+        raise typer.Exit(code=1)
+
+    mapped: List[Dict[str, Any]] = []
+    skipped: List[Dict[str, Any]] = []
+    total_saved = 0
+
+    def process_file(p: Path) -> Dict[str, Any]:
+        local_session = create_session(cfg)
+        local_tmdb = TMDBClient(cfg, local_session)
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:
+            return {"mapped": [], "saved": 0, "skipped": [{"file": p.name, "reason": f"read_error: {e}"}]}
+        our_id = str(obj.get("our_id") or p.stem.replace(".cartoons", ""))
+        items = obj.get("epg")
+        if not isinstance(items, list):
+            return {"mapped": [], "saved": 0, "skipped": [{"our_id": our_id, "reason": "no_epg_list"}]}
+        if limit_per_channel is not None:
+            items = items[:limit_per_channel]
+        posters_dir = POSTERS_CARTOONS_DIR / our_id
+        loc_mapped: List[Dict[str, Any]] = []
+        loc_skipped: List[Dict[str, Any]] = []
+        saved = 0
+        for it in items:
+            if not isinstance(it, dict):
+                loc_skipped.append({"our_id": our_id, "id": None, "reason": "invalid_item"})
+                continue
+            title = it.get("title") or it.get("name")
+            if not isinstance(title, str) or not title.strip():
+                loc_skipped.append({"our_id": our_id, "id": it.get("id"), "reason": "no_title"})
+                continue
+            year = _compute_year_from_ts(it.get("timestart"))
+            # Ретраи получения URL постера
+            url = None
+            for attempt in range(3):
+                try:
+                    url = local_tmdb.get_poster_url(title, year=year)
+                    if isinstance(url, str) and url.startswith("http"):
+                        break
+                except Exception:
+                    url = None
+                time.sleep(0.4 * (attempt + 1))
+            if not isinstance(url, str) or not url.startswith("http"):
+                loc_skipped.append({"our_id": our_id, "id": it.get("id"), "title": title, "reason": "no_tmdb_url"})
+                continue
+            local = download_poster(local_session, url, posters_dir, title=title, epg_id=it.get("id"), year=year, source="tmdb")
+            if local:
+                saved += 1
+                loc_mapped.append({
+                    "our_id": our_id,
+                    "id": it.get("id"),
+                    "title": title,
+                    "year": year,
+                    "timestart": it.get("timestart"),
+                    "timestop": it.get("timestop"),
+                    "poster_url": url,
+                    "poster_local": local,
+                    "source": "tmdb",
+                })
+            else:
+                loc_skipped.append({"our_id": our_id, "id": it.get("id"), "title": title, "reason": "download_failed", "poster_url": url})
+        return {"mapped": loc_mapped, "saved": saved, "skipped": loc_skipped}
+
+    with ThreadPoolExecutor(max_workers=max(1, int(workers))) as ex:
+        futures = {ex.submit(process_file, p): p for p in files}
+        for fut in track(as_completed(futures), description="Скачивание постеров (мультфильмы)", total=len(futures)):
+            res = fut.result()
+            mapped.extend(res.get("mapped", []))
+            total_saved += int(res.get("saved", 0))
+            skipped.extend(res.get("skipped", []))
+
+    EPG_CARTOONS_POSTERS_PATH.write_text(json.dumps(mapped, ensure_ascii=False, indent=2), encoding="utf-8")
+    EPG_CARTOONS_POSTERS_SKIPPED_PATH.write_text(json.dumps(skipped, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[green]Готово[/green]: скачано {total_saved} постеров. Маппинг: {EPG_CARTOONS_POSTERS_PATH}. Пропуски: {len(skipped)} → {EPG_CARTOONS_POSTERS_SKIPPED_PATH}")
+
+
+@app.command()
+def build_channel_json_movies(
+    limit_per_channel: Optional[int] = typer.Option(None, help="Ограничить количество элементов на канал"),
+    workers: int = typer.Option(6, help="Количество параллельно обрабатываемых файлов каналов"),
+) -> None:
+    """Сформировать per-channel JSON с обогащением TMDB для фильмов.
+
+    Источник: `data/epg_channels_filtered/*.movies.json`
+    Результат: `data/channel_json/movies/{our_id}.json`
+    """
+    cfg = load_config()
+    setup_logging(cfg.log_level)
+    if not EPG_FILTERED_DIR.exists():
+        print(f"[yellow]{EPG_FILTERED_DIR} не найден. Сначала выполните filter-epg-movies[/yellow]")
+        raise typer.Exit(code=1)
+
+    files = sorted([p for p in EPG_FILTERED_DIR.glob("*.movies.json") if p.is_file()])
+    if not files:
+        print(f"[yellow]Нет файлов фильмов в {EPG_FILTERED_DIR}[/yellow]")
+        raise typer.Exit(code=1)
+
+    def process_file(p: Path) -> Dict[str, Any]:
+        session = create_session(cfg)
+        tmdb = TMDBClient(cfg, session)
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:
+            return {"saved": 0, "errors": [f"{p.name}: read_error: {e}"]}
+        our_id = str(obj.get("our_id") or p.stem.replace(".movies", ""))
+        items = obj.get("epg")
+        if not isinstance(items, list):
+            return {"saved": 0, "errors": [f"{p.name}: no_epg_list"]}
+        if limit_per_channel is not None:
+            items = items[:limit_per_channel]
+        posters_dir = POSTERS_MOVIES_DIR / our_id
+        enriched_items: List[Dict[str, Any]] = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            title = it.get("title") or it.get("name")
+            if not isinstance(title, str) or not title.strip():
+                continue
+            year_hint = _compute_year_from_ts(it.get("timestart"))
+            info = tmdb.get_movie_info(title, year=year_hint)
+            # Подбор URL постера: TMDB -> превью из EPG
+            candidate_urls: List[Dict[str, Any]] = []
+            if isinstance(info, dict):
+                pu = info.get("poster_url")
+                if isinstance(pu, str) and pu.startswith("http"):
+                    candidate_urls.append({"url": pu, "source": "tmdb"})
+            prev_url = it.get("preview")
+            if isinstance(prev_url, str) and prev_url.startswith("http"):
+                candidate_urls.append({"url": prev_url, "source": "preview"})
+            poster_local: Optional[str] = None
+            poster_source: Optional[str] = None
+            poster_ext_url: Optional[str] = None
+            for cand in candidate_urls:
+                poster_ext_url = cand["url"]
+                local = download_poster(
+                    session=session,
+                    url=poster_ext_url,
+                    posters_dir=posters_dir,
+                    title=title,
+                    epg_id=it.get("id"),
+                    year=info.get("year") if isinstance(info, dict) else year_hint,
+                    source=cand.get("source"),
+                )
+                if local:
+                    poster_local = local
+                    poster_source = cand.get("source")
+                    break
+            enriched_items.append({
+                "id": it.get("id"),
+                "title": title,
+                "desc": it.get("desc"),
+                "timestart": it.get("timestart"),
+                "timestop": it.get("timestop"),
+                "preview": it.get("preview"),
+                "our_id": our_id,
+                "kinopoisk": info,  # TMDB-совместимая структура
+                "poster_url": poster_ext_url,
+                "poster_local": poster_local,
+                "poster_static": _static_url_from_local(poster_local),
+                "poster_source": poster_source,
+            })
+        out = {"our_id": our_id, "count": len(enriched_items), "items": enriched_items}
+        out_path = CHANNEL_MOVIES_DIR / f"{our_id}.json"
+        out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"saved": len(enriched_items), "errors": []}
+
+    total_saved = 0
+    total_errors: List[str] = []
+    with ThreadPoolExecutor(max_workers=max(1, int(workers))) as ex:
+        futures = {ex.submit(process_file, p): p for p in files}
+        for fut in track(as_completed(futures), description="Формирование per-channel JSON (фильмы)", total=len(futures)):
+            res = fut.result()
+            total_saved += int(res.get("saved", 0))
+            total_errors.extend(res.get("errors", []))
+    print(f"[green]Готово[/green]: записано {total_saved} элементов. Выход: {CHANNEL_MOVIES_DIR}")
+    if total_errors:
+        print(f"[yellow]Ошибки[/yellow]: {len(total_errors)}")
+
+
+@app.command()
+def build_channel_json_cartoons(
+    limit_per_channel: Optional[int] = typer.Option(None, help="Ограничить количество элементов на канал"),
+    workers: int = typer.Option(6, help="Количество параллельно обрабатываемых файлов каналов"),
+) -> None:
+    """Сформировать per-channel JSON с обогащением TMDB для мультфильмов.
+
+    Источник: `data/epg_channels_cartoons/*.cartoons.json`
+    Результат: `data/channel_json/cartoons/{our_id}.json`
+    """
+    cfg = load_config()
+    setup_logging(cfg.log_level)
+    if not EPG_CARTOONS_DIR.exists():
+        print(f"[yellow]{EPG_CARTOONS_DIR} не найден. Сначала выполните filter-epg-cartoons[/yellow]")
+        raise typer.Exit(code=1)
+
+    files = sorted([p for p in EPG_CARTOONS_DIR.glob("*.cartoons.json") if p.is_file()])
+    if not files:
+        print(f"[yellow]Нет файлов мультфильмов в {EPG_CARTOONS_DIR}[/yellow]")
+        raise typer.Exit(code=1)
+
+    def process_file(p: Path) -> Dict[str, Any]:
+        session = create_session(cfg)
+        tmdb = TMDBClient(cfg, session)
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:
+            return {"saved": 0, "errors": [f"{p.name}: read_error: {e}"]}
+        our_id = str(obj.get("our_id") or p.stem.replace(".cartoons", ""))
+        items = obj.get("epg")
+        if not isinstance(items, list):
+            return {"saved": 0, "errors": [f"{p.name}: no_epg_list"]}
+        if limit_per_channel is not None:
+            items = items[:limit_per_channel]
+        posters_dir = POSTERS_CARTOONS_DIR / our_id
+        enriched_items: List[Dict[str, Any]] = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            title = it.get("title") or it.get("name")
+            if not isinstance(title, str) or not title.strip():
+                continue
+            year_hint = _compute_year_from_ts(it.get("timestart"))
+            info = tmdb.get_movie_info(title, year=year_hint)
+            candidate_urls: List[Dict[str, Any]] = []
+            if isinstance(info, dict):
+                pu = info.get("poster_url")
+                if isinstance(pu, str) and pu.startswith("http"):
+                    candidate_urls.append({"url": pu, "source": "tmdb"})
+            prev_url = it.get("preview")
+            if isinstance(prev_url, str) and prev_url.startswith("http"):
+                candidate_urls.append({"url": prev_url, "source": "preview"})
+            poster_local: Optional[str] = None
+            poster_source: Optional[str] = None
+            poster_ext_url: Optional[str] = None
+            for cand in candidate_urls:
+                poster_ext_url = cand["url"]
+                local = download_poster(
+                    session=session,
+                    url=poster_ext_url,
+                    posters_dir=posters_dir,
+                    title=title,
+                    epg_id=it.get("id"),
+                    year=info.get("year") if isinstance(info, dict) else year_hint,
+                    source=cand.get("source"),
+                )
+                if local:
+                    poster_local = local
+                    poster_source = cand.get("source")
+                    break
+            enriched_items.append({
+                "id": it.get("id"),
+                "title": title,
+                "desc": it.get("desc"),
+                "timestart": it.get("timestart"),
+                "timestop": it.get("timestop"),
+                "preview": it.get("preview"),
+                "our_id": our_id,
+                "kinopoisk": info,
+                "poster_url": poster_ext_url,
+                "poster_local": poster_local,
+                "poster_static": _static_url_from_local(poster_local),
+                "poster_source": poster_source,
+            })
+        out = {"our_id": our_id, "count": len(enriched_items), "items": enriched_items}
+        out_path = CHANNEL_CARTOONS_DIR / f"{our_id}.json"
+        out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"saved": len(enriched_items), "errors": []}
+
+    total_saved = 0
+    total_errors: List[str] = []
+    with ThreadPoolExecutor(max_workers=max(1, int(workers))) as ex:
+        futures = {ex.submit(process_file, p): p for p in files}
+        for fut in track(as_completed(futures), description="Формирование per-channel JSON (мультфильмы)", total=len(futures)):
+            res = fut.result()
+            total_saved += int(res.get("saved", 0))
+            total_errors.extend(res.get("errors", []))
+    print(f"[green]Готово[/green]: записано {total_saved} элементов. Выход: {CHANNEL_CARTOONS_DIR}")
+    if total_errors:
+        print(f"[yellow]Ошибки[/yellow]: {len(total_errors)}")
+
 def _enrich(limit: Optional[int] = None) -> None:
     """Внутренняя реализация обогащения фильмов."""
     cfg = load_config()
@@ -445,6 +893,14 @@ def _enrich(limit: Optional[int] = None) -> None:
         if isinstance(prev_url, str) and prev_url.startswith("http"):
             candidate_urls.append({"url": prev_url, "source": "preview"})
 
+        # Вычислим год для имени файла
+        year_for_name = None
+        if isinstance(info, dict) and isinstance(info.get("year"), int):
+            year_for_name = info.get("year")
+        else:
+            ts_any = item.get("timestart")
+            year_for_name = _compute_year_from_ts(ts_any)
+
         poster_local: Any = None
         poster_source: Any = None
         for cand in candidate_urls:
@@ -455,6 +911,8 @@ def _enrich(limit: Optional[int] = None) -> None:
                 posters_dir=POSTERS_DIR,
                 title=title,
                 epg_id=item.get("id"),
+                year=year_for_name,
+                source=cand.get("source"),
             )
             if poster_local:
                 poster_source = cand.get("source")

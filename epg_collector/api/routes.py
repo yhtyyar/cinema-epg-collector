@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
+from typing import Optional, List
+from pathlib import Path
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from epg_collector.api.models import MoviesResponse, Pagination, Movie
+from epg_collector.api.models import (
+    MoviesResponse,
+    Pagination,
+    Movie,
+    ChannelsResponse,
+    ChannelItem,
+    ChannelData,
+)
 from epg_collector.api.dependencies import get_repository, get_cache, get_settings
 from epg_collector.api.repository import MoviesRepository
 from epg_collector.api.cache import TTLCache
@@ -95,3 +104,85 @@ async def get_movie(
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
     return movie
+
+
+# --- Channels (per-channel JSON) ---
+
+CHANNEL_MOVIES_DIR = Path("data/channel_json/movies")
+CHANNEL_CARTOONS_DIR = Path("data/channel_json/cartoons")
+
+
+def _list_channels_from_dir(directory: Path) -> List[ChannelItem]:
+    channels: List[ChannelItem] = []
+    if not directory.exists():
+        return channels
+    for p in sorted(directory.glob("*.json")):
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+            cid = str(obj.get("our_id") or p.stem)
+            cnt = int(obj.get("count") or (len(obj.get("items", [])) if isinstance(obj.get("items"), list) else 0))
+            channels.append(ChannelItem(id=cid, count=cnt))
+        except Exception:
+            # Пропускаем битые файлы
+            continue
+    return channels
+
+
+@router.get("/channels/movies", response_model=ChannelsResponse)
+async def list_channels_movies(cache: TTLCache = Depends(get_cache)) -> ChannelsResponse:
+    key = _cache_key("/api/channels/movies")
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    channels = _list_channels_from_dir(CHANNEL_MOVIES_DIR)
+    resp = ChannelsResponse(channels=channels)
+    cache.set(key, resp)
+    return resp
+
+
+@router.get("/channels/cartoons", response_model=ChannelsResponse)
+async def list_channels_cartoons(cache: TTLCache = Depends(get_cache)) -> ChannelsResponse:
+    key = _cache_key("/api/channels/cartoons")
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    channels = _list_channels_from_dir(CHANNEL_CARTOONS_DIR)
+    resp = ChannelsResponse(channels=channels)
+    cache.set(key, resp)
+    return resp
+
+
+def _read_channel_file(directory: Path, channel_id: str) -> ChannelData:
+    path = directory / f"{channel_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Channel not found")
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8"))
+        # Валидация через модель
+        return ChannelData(**obj)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to read channel data")
+
+
+@router.get("/channels/movies/{channel_id}", response_model=ChannelData)
+async def get_channel_movies(channel_id: str, cache: TTLCache = Depends(get_cache)) -> ChannelData:
+    key = _cache_key("/api/channels/movies/{channel_id}", channel_id=channel_id)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    data = _read_channel_file(CHANNEL_MOVIES_DIR, channel_id)
+    cache.set(key, data)
+    return data
+
+
+@router.get("/channels/cartoons/{channel_id}", response_model=ChannelData)
+async def get_channel_cartoons(channel_id: str, cache: TTLCache = Depends(get_cache)) -> ChannelData:
+    key = _cache_key("/api/channels/cartoons/{channel_id}", channel_id=channel_id)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    data = _read_channel_file(CHANNEL_CARTOONS_DIR, channel_id)
+    cache.set(key, data)
+    return data

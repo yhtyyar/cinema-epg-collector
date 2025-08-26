@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -50,3 +50,34 @@ class MoviesResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+# Channels (per-channel JSON) models
+class ChannelItem(BaseModel):
+    id: str
+    count: int
+
+
+class ChannelsResponse(BaseModel):
+    channels: List[ChannelItem]
+
+
+class ChannelEntry(BaseModel):
+    id: Optional[str] = None
+    title: Optional[str] = None
+    desc: Optional[str] = None
+    timestart: Optional[int] = None
+    timestop: Optional[int] = None
+    preview: Optional[str] = None
+    our_id: Optional[str] = None
+    kinopoisk: Optional[Dict[str, Any]] = None
+    poster_url: Optional[str] = None
+    poster_local: Optional[str] = None
+    poster_static: Optional[str] = None
+    poster_source: Optional[str] = None
+
+
+class ChannelData(BaseModel):
+    our_id: str
+    count: int
+    items: List[ChannelEntry]
