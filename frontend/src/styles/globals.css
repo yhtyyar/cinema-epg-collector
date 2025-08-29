@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+html, body, #root { height: 100%; }
+
+body { @apply bg-bg-light text-fg-light transition-theme; }
+
+.dark body { @apply bg-bg-dark text-fg-dark; }
+
+.container-responsive { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+
+.skeleton { @apply animate-pulse bg-gray-300/30 dark:bg-gray-600/30 rounded; }

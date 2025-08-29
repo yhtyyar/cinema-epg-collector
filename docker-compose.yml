@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # Main application service
+  cinema-epg-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cinema-epg-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - AUTO_RUN_PIPELINE=true
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - cinema-network
+
+  # Frontend service (optional, for development)
+  cinema-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cinema-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    depends_on:
+      - cinema-epg-api
+    restart: unless-stopped
+    networks:
+      - cinema-network
+    profiles:
+      - frontend
+
+  # Nginx reverse proxy (optional, for production)
+  nginx:
+    image: nginx:alpine
+    container_name: cinema-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data:/var/www/static:ro
+    depends_on:
+      - cinema-epg-api
+    restart: unless-stopped
+    networks:
+      - cinema-network
+    profiles:
+      - production
+
+networks:
+  cinema-network:
+    driver: bridge
+
+volumes:
+  data:
+  cache:
+  logs:
