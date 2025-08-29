@@ -1,11 +1,11 @@
 // pages/MovieDetailPageNew.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Movie } from '../types/movie';
-import { useMovies, useMoviesByDate } from '../hooks/useMovies';
-import { MovieCarousel } from '../components/movie-carousel/MovieCarousel';
-import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { ErrorMessage } from '../components/common/ErrorMessage';
+import { Movie } from '../types/movie-new';
+import { useMovies, useMoviesByDate } from '../hooks/useMoviesNew';
+import { MovieCarousel } from '../components/movie-carousel/MovieCarouselNew';
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import ErrorMessage from '../components/common/ErrorMessage';
 
 export default function MovieDetailPageNew() {
   const { id } = useParams<{ id: string }>();
@@ -71,108 +71,152 @@ export default function MovieDetailPageNew() {
     return 'text-red-500';
   };
 
+  const getCarouselTitle = () => {
+    const movieDate = currentMovie.epg_data.broadcast_time.split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (movieDate === today) {
+      return 'Другие фильмы сегодня';
+    } else {
+      const date = new Date(movieDate);
+      const formattedDate = date.toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        weekday: 'long'
+      });
+      return `Другие фильмы на ${formattedDate}`;
+    }
+  };
+
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Movie Poster and Info */}
-        <div className="lg:col-span-2">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-            <div className="aspect-w-16 aspect-h-9 bg-gray-200 dark:bg-gray-700">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Back Button */}
+        <button
+          onClick={() => navigate('/')}
+          className="mb-6 flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Назад к фильмам</span>
+        </button>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-12">
+          {/* Movie Poster */}
+          <div className="flex justify-center lg:justify-start">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden max-w-sm">
               {currentMovie.tmdb_data?.poster_url ? (
                 <img
                   src={currentMovie.tmdb_data.poster_url}
                   alt={currentMovie.epg_data.title}
-                  className="w-full h-96 object-cover"
+                  className="w-full h-auto object-contain"
+                  style={{ aspectRatio: '2/3', maxHeight: '600px' }}
+                />
+              ) : currentMovie.epg_data.preview_image ? (
+                <img
+                  src={currentMovie.epg_data.preview_image}
+                  alt={currentMovie.epg_data.title}
+                  className="w-full h-auto object-contain"
+                  style={{ aspectRatio: '2/3', maxHeight: '600px' }}
                 />
               ) : (
-                <div className="w-full h-96 flex items-center justify-center text-gray-400">
-                  <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <div 
+                  className="w-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center"
+                  style={{ aspectRatio: '2/3', maxHeight: '600px' }}
+                >
+                  <svg className="w-20 h-20 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16l13-8L7 4z" />
                   </svg>
                 </div>
               )}
             </div>
+          </div>
 
-            <div className="p-6">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          {/* Movie Info */}
+          <div className="space-y-6">
+            {/* Title and Basic Info */}
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
                 {currentMovie.epg_data.title}
               </h1>
 
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="flex items-center space-x-1">
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex flex-wrap items-center gap-6 mb-6">
+                {/* Broadcast Time */}
+                <div className="flex items-center space-x-2 bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-lg">
+                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="text-blue-800 dark:text-blue-300 font-medium">
                     {formatTime(currentMovie.epg_data.broadcast_time)}
                   </span>
                 </div>
 
+                {/* Rating */}
                 {currentMovie.tmdb_data?.rating && (
-                  <div className={`flex items-center space-x-1 ${getRatingColor(currentMovie.tmdb_data.rating)}`}>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  <div className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-lg shadow-lg">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                     </svg>
-                    <span className="font-medium">
+                    <span className="font-bold text-lg">
                       {currentMovie.tmdb_data.rating.toFixed(1)}
                     </span>
                   </div>
                 )}
-              </div>
 
-              {currentMovie.tmdb_data?.genres && currentMovie.tmdb_data.genres.length > 0 && (
-                <div className="mb-4">
-                  <div className="flex flex-wrap gap-2">
-                    {currentMovie.tmdb_data.genres.map((genre, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm rounded-full"
-                      >
-                        {genre}
-                      </span>
-                    ))}
+                {/* Year */}
+                {currentMovie.tmdb_data?.year && (
+                  <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 px-4 py-2 rounded-lg">
+                    <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                      {currentMovie.tmdb_data.year}
+                    </span>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            </div>
 
-              <div className="prose dark:prose-invert max-w-none">
-                <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+            {/* Genres */}
+            {currentMovie.tmdb_data?.genres && currentMovie.tmdb_data.genres.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Жанры</h3>
+                <div className="flex flex-wrap gap-2">
+                  {currentMovie.tmdb_data.genres.map((genre: string, index: number) => (
+                    <span
+                      key={index}
+                      className="px-4 py-2 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/50 dark:to-purple-900/50 text-blue-800 dark:text-blue-200 text-sm rounded-full font-medium border border-blue-200 dark:border-blue-700"
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Description */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Описание</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-lg">
                   {currentMovie.epg_data.description || currentMovie.tmdb_data?.description || 'Описание недоступно'}
                 </p>
               </div>
-
-              {currentMovie.tmdb_data?.year && (
-                <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-                  Год выпуска: {currentMovie.tmdb_data.year}
-                </div>
-              )}
             </div>
           </div>
         </div>
 
         {/* Related Movies Carousel */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-4">
-            <MovieCarousel
-              title="Другие фильмы сегодня"
-              movies={sameDayMovies.slice(0, 6)}
-              onMovieClick={handleMovieClick}
-              className="space-y-4"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Additional Carousel for More Movies */}
-      {sameDayMovies.length > 6 && (
-        <div className="mt-12">
+        <div className="mt-16">
           <MovieCarousel
-            title="Ещё фильмы на сегодня"
-            movies={sameDayMovies.slice(6)}
+            title={getCarouselTitle()}
+            movies={sameDayMovies}
             onMovieClick={handleMovieClick}
           />
         </div>
-      )}
+      </div>
     </div>
   );
 }

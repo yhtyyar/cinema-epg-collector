@@ -84,7 +84,7 @@ export const MovieCarousel: React.FC<MovieCarouselProps> = ({
         ))}
       </div>
 
-      <style jsx>{`
+      <style>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
         }
