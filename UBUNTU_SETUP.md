@@ -1,33 +1,33 @@
-# Ubuntu Setup Guide for IPTV EPG Collector
+# Руководство по настройке на Ubuntu для IPTV EPG Collector
 
-This guide provides step-by-step instructions for manually deploying the IPTV EPG Collector on an Ubuntu server.
+Это руководство содержит пошаговые инструкции для ручного развертывания IPTV EPG Collector на сервере Ubuntu.
 
-## 📋 Prerequisites
+## 📋 Предварительные требования
 
-- Ubuntu 20.04 or later
-- Root or sudo access
-- At least 2GB RAM
-- At least 10GB free disk space
+- Ubuntu 20.04 или новее
+- Доступ root или sudo
+- Минимум 2 ГБ ОЗУ
+- Минимум 10 ГБ свободного места на диске
 
-## 🛠️ Installation Steps
+## 🛠️ Шаги установки
 
-### 1. Update System Packages
+### 1. Обновление системных пакетов
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
 
-### 2. Install Required Packages
+### 2. Установка необходимых пакетов
 ```bash
 sudo apt install -y python3 python3-pip python3-venv curl git nodejs npm
 ```
 
-### 3. Clone the Repository
+### 3. Клонирование репозитория
 ```bash
-git clone <repository-url>
+git clone https://github.com/yhtyyar/cinema-epg-collector.git
 cd cinema-epg-collector
 ```
 
-### 4. Set Up Python Virtual Environment
+### 4. Настройка виртуального окружения Python
 ```bash
 python3 -m venv venv
 source venv/bin/activate
@@ -35,53 +35,53 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 5. Configure Environment Variables
+### 5. Настройка переменных окружения
 ```bash
 cp .env.example .env
-# Edit the .env file with your settings
+# Отредактируйте файл .env с вашими настройками
 nano .env
 ```
 
-Important variables to configure:
-- `TMDB_API_KEY` - Get this from https://www.themoviedb.org/settings/api
-- `IPTV_HEADER_X_TOKEN` - Your IPTV provider token
+Важные переменные для настройки:
+- `TMDB_API_KEY` - Получите это на https://www.themoviedb.org/settings/api
+- `IPTV_HEADER_X_TOKEN` - Ваш токен провайдера IPTV
 
-### 6. Create Required Directories
+### 6. Создание необходимых директорий
 ```bash
 mkdir -p data/posters cache logs
 ```
 
-### 7. Run Data Collection Pipeline
+### 7. Запуск конвейера сбора данных
 ```bash
 python -m epg_collector.cli run-all
 ```
 
-### 8. Start the API Server
+### 8. Запуск сервера API
 ```bash
 uvicorn epg_collector.api.app:app --host 0.0.0.0 --port 8000
 ```
 
-The API will be available at `http://your-server-ip:8000`
+API будет доступен по адресу `http://your-server-ip:8000`
 
-### 9. Set Up Frontend (Optional)
+### 9. Настройка фронтенда (опционально)
 ```bash
 cd frontend
 npm ci
 npm run build
 ```
 
-Serve the built frontend files with any web server (nginx, Apache, etc.)
+Разместите собранные файлы фронтенда любым веб-сервером (nginx, Apache и т.д.)
 
-## 🔧 Running as a Service (Optional)
+## 🔧 Запуск как сервис (опционально)
 
-To run the application as a systemd service:
+Для запуска приложения как сервис systemd:
 
-### 1. Create a systemd service file:
+### 1. Создайте файл сервиса systemd:
 ```bash
 sudo nano /etc/systemd/system/cinema-epg.service
 ```
 
-### 2. Add the following content:
+### 2. Добавьте следующее содержимое:
 ```ini
 [Unit]
 Description=Cinema EPG Collector
@@ -99,67 +99,67 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-### 3. Enable and start the service:
+### 3. Включите и запустите сервис:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable cinema-epg
 sudo systemctl start cinema-epg
 ```
 
-## 🔄 Updating Data
+## 🔄 Обновление данных
 
-To update the movie data, run:
+Для обновления данных фильмов запустите:
 ```bash
 cd /path/to/cinema-epg-collector
 source venv/bin/activate
 python -m epg_collector.cli run-all
 ```
 
-You can set up a cron job to automatically update data daily:
+Вы можете настроить задание cron для автоматического ежедневного обновления данных:
 ```bash
-# Add to crontab (crontab -e)
+# Добавьте в crontab (crontab -e)
 0 2 * * * cd /path/to/cinema-epg-collector && /path/to/cinema-epg-collector/venv/bin/python -m epg_collector.cli run-all
 ```
 
-## 📁 Directory Structure
+## 📁 Структура директорий
 
-After setup, your directory will contain:
-- `data/` - Contains collected data and posters
-- `cache/` - HTTP request cache
-- `logs/` - Application logs
-- `venv/` - Python virtual environment (created during setup)
+После настройки ваша директория будет содержать:
+- `data/` - Содержит собранные данные и постеры
+- `cache/` - Кэш HTTP-запросов
+- `logs/` - Логи приложения
+- `venv/` - Виртуальное окружение Python (создается во время настройки)
 
-## 🔒 Security Considerations
+## 🔒 Вопросы безопасности
 
-1. Change the default API port (8000) if exposing to the internet
-2. Set up a reverse proxy (nginx) with SSL/TLS
-3. Restrict API access with firewall rules
-4. Use strong authentication for production deployments
+1. Измените порт API по умолчанию (8000), если вы expose его в интернет
+2. Настройте обратный прокси (nginx) с SSL/TLS
+3. Ограничьте доступ к API с помощью правил брандмауэра
+4. Используйте надежную аутентификацию для производственных развертываний
 
-## 🆘 Troubleshooting
+## 🆘 Устранение неполадок
 
-### Common Issues:
+### Распространенные проблемы:
 
-1. **Permission errors**: Ensure the user running the service has read/write access to data, cache, and logs directories.
+1. **Ошибки доступа**: Убедитесь, что пользователь, запускающий сервис, имеет права на чтение/запись в директории data, cache и logs.
 
-2. **Port already in use**: Change the port in the uvicorn command or stop the process using the port:
+2. **Порт уже используется**: Измените порт в команде uvicorn или остановите процесс, использующий порт:
    ```bash
    sudo lsof -i :8000
    kill -9 <PID>
    ```
 
-3. **Missing dependencies**: Ensure all required packages are installed:
+3. **Отсутствующие зависимости**: Убедитесь, что все необходимые пакеты установлены:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **TMDB API issues**: Verify your TMDB API key is correct and active.
+4. **Проблемы с API TMDB**: Проверьте правильность и активность вашего ключа API TMDB.
 
-### Check Logs:
+### Проверка логов:
 
-Application logs are written to the `logs/` directory and to stdout when running the server.
+Логи приложения записываются в директорию `logs/` и в stdout при запуске сервера.
 
-For systemd service logs:
+Для логов сервиса systemd:
 ```bash
 sudo journalctl -u cinema-epg -f
 ```
