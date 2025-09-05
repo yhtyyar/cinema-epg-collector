@@ -1,105 +1,110 @@
-# IPTV EPG Collector - Manual Deployment Guide
+# IPTV EPG Collector - Руководство по ручному развертыванию
 
-This project collects IPTV EPG data, filters movies, enriches them with TMDB data, and provides a REST API for accessing the data.
+Этот проект собирает данные EPG IPTV, фильтрует фильмы, обогащает их данными TMDB и предоставляет REST API для доступа к данным.
 
-## 📋 Prerequisites
+## 📋 Предварительные требования
 
-- Ubuntu 20.04 or later
+- Ubuntu 20.04 или новее
 - Python 3.8+
-- Node.js 16+ (for frontend)
-- TMDB API key (free at https://www.themoviedb.org/settings/api)
+- Node.js 16+ (для фронтенда)
+- Ключ API TMDB (бесплатно на https://www.themoviedb.org/settings/api)
 
-## 🛠️ Manual Installation
+## 🛠️ Ручная установка
 
-### 1. Clone the Repository
+### 1. Клонирование репозитория
 ```bash
-git clone <repository-url>
+git clone https://github.com/yhtyyar/cinema-epg-collector.git
 cd cinema-epg-collector
 ```
 
-### 2. Set Up Python Environment
+### 2. Настройка виртуального окружения Python
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment Variables
+### 3. Настройка переменных окружения
 ```bash
 cp .env.example .env
-# Edit .env file with your TMDB API key and other settings
+# Отредактируйте файл .env с вашим ключом TMDB API и другими настройками
 nano .env
 ```
 
-### 4. Create Required Directories
+### 4. Создание необходимых директорий
 ```bash
 mkdir -p data/posters cache logs
 ```
 
-### 5. Run Data Collection Pipeline
+### 5. Запуск конвейера сбора данных
 ```bash
 python -m epg_collector.cli run-all
 ```
 
-### 6. Start the API Server
+### 6. Запуск сервера API
 ```bash
 uvicorn epg_collector.api.app:app --host 0.0.0.0 --port 8000
 ```
 
-### 7. Build and Run Frontend (Optional)
+### 7. Сборка и запуск фронтенда (опционально)
 ```bash
 cd frontend
 npm ci
 npm run build
-# Serve the built files with any web server
+# Разместите собранные файлы любым веб-сервером
 ```
 
-## 📊 API Endpoints
+## 📊 Конечные точки API
 
-- `GET /api/movies` - List movies with pagination and filters
-- `GET /api/movies/{id}` - Get movie by ID
-- `GET /api/movies/search?q=...` - Search movies by title
-- `GET /healthz` - Health check endpoint
-- `GET /static/posters/...` - Access downloaded posters
+- `GET /api/movies` - Список фильмов с пагинацией и фильтрами
+- `GET /api/movies/{id}` - Получить фильм по ID
+- `GET /api/movies/search?q=...` - Поиск фильмов по названию
+- `GET /healthz` - Проверка состояния
+- `GET /static/posters/...` - Доступ к загруженным постерам
 
-## 🎬 Manual Pipeline Commands
+## 🎬 Команды ручного конвейера
 
-You can run individual steps of the pipeline:
+Вы можете запускать отдельные шаги конвейера:
 
 ```bash
-# 1. Fetch EPG data
+# 1. Получить данные EPG
 python -m epg_collector.cli fetch-epg-cmd
 
-# 2. Filter movies
+# 2. Отфильтровать фильмы
 python -m epg_collector.cli filter-movies-cmd
 
-# 3. Enrich with TMDB data
+# 3. Обогатить данными TMDB
 python -m epg_collector.cli enrich
 ```
 
-## ⚙️ Environment Variables
+## ⚙️ Переменные окружения
 
-Key variables in `.env`:
-- `TMDB_API_KEY` - Required for movie data enrichment
-- `IPTV_HEADER_X_TOKEN` - Your IPTV provider token
-- `LOG_LEVEL` - Logging verbosity (INFO, DEBUG, etc.)
+Основные переменные в файле `.env`:
+- `TMDB_API_KEY` - Обязателен для обогащения данных фильмов
+- `IPTV_HEADER_X_TOKEN` - Ваш токен провайдера IPTV
+- `LOG_LEVEL` - Уровень детализации логов (INFO, DEBUG и т.д.)
 
-## 📁 Directory Structure
+## 📁 Структура директорий
 
-- `data/` - Contains collected data and posters
-- `cache/` - HTTP request cache
-- `logs/` - Application logs
-- `epg_collector/` - Main Python application
-- `frontend/` - React frontend application
+- `data/` - Содержит собранные данные и постеры
+- `cache/` - Кэш HTTP-запросов
+- `logs/` - Логи приложения
+- `epg_collector/` - Основное приложение Python
+- `frontend/` - Приложение фронтенда React
 
-## 🔄 Data Update
+## 🔄 Обновление данных
 
-To update the movie data, run:
+Для обновления данных фильмов запустите:
 ```bash
 python -m epg_collector.cli run-all
 ```
 
-The API will automatically serve the updated data.
+API будет автоматически обслуживать обновленные данные.
+
+## 📖 Дополнительная документация
+
+- [UBUNTU_SETUP.md](UBUNTU_SETUP.md) - Подробное руководство по установке на Ubuntu
+- [REFACTORED.md](REFACTORED.md) - Документация по рефакторингу проекта
 
 ## 🚀 Возможности
 - **Автоматизированный Docker deployment** с одной командой
