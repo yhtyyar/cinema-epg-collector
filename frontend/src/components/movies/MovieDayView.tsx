@@ -1,7 +1,8 @@
-// components/movies/MovieDayView.tsx
+import { Movie } from '../../types/movie';
+import MovieCard from './MovieCard'; omponents / movies / MovieDayView.tsx
 import React from 'react';
 import { Movie } from '../../types/movie';
-import { MovieCard } from './MovieCard';
+import MovieCard from './MovieCard';
 
 interface MovieDayViewProps {
   date: string;

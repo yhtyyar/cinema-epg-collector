@@ -1,7 +1,6 @@
-// components/movie-carousel/MovieCarousel.tsx
-import React from 'react';
+import { type FC, useRef } from 'react';
 import { Movie } from '../../types/movie';
-import { MovieCard } from '../movies/MovieCard';
+import MovieCard from '../movies/MovieCard';
 
 interface MovieCarouselProps {
   title: string;
