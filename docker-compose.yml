@@ -1,0 +1,39 @@
+version: '3.8'
+
+# This docker-compose.yml file is provided for reference only.
+# For manual deployment on Ubuntu, please follow the instructions in README.md
+
+services:
+  cinema-epg-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cinema-epg-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - cinema-network
+
+networks:
+  cinema-network:
+    driver: bridge
+
+volumes:
+  data:
+  cache:
+  logs:

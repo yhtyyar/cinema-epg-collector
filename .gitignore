@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.dist-info/
+.eggs/
+
+# IDE/Editor
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
+!logs/.gitkeep
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+
+# Caches
+.cache/
+pytest_cache/
+http_cache.sqlite
+
+# Project data and artifacts
+cache/
+!cache/.gitkeep
+
+data/posters/
+
+data/*.json
+!data/.gitkeep
+
+filtered_result.json
+
+# Bootstrap and deployment artifacts
+bootstrap.log
+deploy.log
+bootstrap-backup/
+backups/
+
+# Docker
+*.pid
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/tsconfig.tsbuildinfo
+
+# Android
+android-app/.gradle/
+android-app/local.properties
+android-app/**/build/
+android-app/**/captures/
+android-app/**/*.iml
+android-app/*.keystore
+android-app/*.jks
+*.apk
