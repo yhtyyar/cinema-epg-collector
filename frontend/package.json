@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:host": "vite --host",
+    "dev:custom": "vite --host $VITE_HOST --port $VITE_PORT",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },

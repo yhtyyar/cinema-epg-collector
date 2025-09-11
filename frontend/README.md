@@ -51,6 +51,30 @@ npm install
 npm run dev
 ```
 
+### Development Server with Custom Host/Port
+
+You can customize the host and port in several ways:
+
+1. **Using environment variables**:
+   Create a `.env` file in the frontend directory with:
+   ```env
+   VITE_HOST=0.0.0.0
+   VITE_PORT=3000
+   ```
+   Then run:
+   ```bash
+   npm run dev
+   ```
+
+2. **Using command line arguments**:
+   ```bash
+   # To expose the server to all network interfaces
+   npm run dev:host
+   
+   # On Unix-like systems, you can also specify host/port directly:
+   VITE_HOST=0.0.0.0 VITE_PORT=3000 npm run dev
+   ```
+
 ### Build for Production
 
 ```bash
@@ -88,7 +112,7 @@ The application supports dark mode with automatic detection of system preference
 - Code splitting
 - Lazy loading
 - Memoization
-- Efficient re-rendering
+- Efficient re-renders
 - Image optimization
 - Bundle size optimization
 
