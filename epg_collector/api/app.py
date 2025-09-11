@@ -5,7 +5,7 @@ import logging
 import time
 from typing import List
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -80,8 +80,8 @@ def create_app() -> FastAPI:
             "timestamp": time.time()
         }
 
-    # Smart data pipeline with freshness validation
     async def _run_pipeline_bg() -> None:
+        """Фоновая задача для запуска пайплайна сбора данных."""
         try:
             # Import locally to avoid circular deps on app import
             from epg_collector.cli import run_all as run_pipeline
@@ -103,9 +103,23 @@ def create_app() -> FastAPI:
             except Exception as e:
                 logger.exception("Failed to clear API cache after pipeline: %s", e)
 
+    @app.post("/api/collect-data")
+    async def collect_data(background_tasks: BackgroundTasks):
+        """Запустить сбор данных в фоновом режиме."""
+        background_tasks.add_task(_run_pipeline_bg)
+        return {"message": "Data collection started in background"}
+
     @app.on_event("startup")
     async def _schedule_pipeline_on_startup() -> None:
         from epg_collector.data_validator import should_run_pipeline, get_data_status
+        
+        # If AUTO_RUN_PIPELINE is explicitly set to false, don't run pipeline at startup
+        if not settings.auto_run_pipeline:
+            logger.info("AUTO_RUN_PIPELINE is false, skipping pipeline at startup")
+            # Логируем текущий статус данных
+            data_status = get_data_status()
+            logger.info(f"Статус данных: {data_status}")
+            return
         
         # Проверяем актуальность данных
         should_run, reason = should_run_pipeline(
@@ -115,6 +129,7 @@ def create_app() -> FastAPI:
         
         if should_run:
             logger.info(f"Запуск пайплайна: {reason}")
+            # Run in background without blocking startup
             asyncio.create_task(_run_pipeline_bg())
         else:
             logger.info(f"Пайплайн не требуется: {reason}")

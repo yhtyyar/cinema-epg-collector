@@ -170,22 +170,47 @@ def get_data_status() -> dict:
     Returns:
         dict: Статус всех компонентов данных
     """
+    # Проверяем существование и свежесть файлов, обрабатываем исключения
+    raw_epg_status = {
+        "exists": RAW_EPG_PATH.exists(),
+        "fresh": False,
+        "mtime": None
+    }
+    if RAW_EPG_PATH.exists():
+        try:
+            raw_epg_status["fresh"] = is_file_fresh(RAW_EPG_PATH)
+            raw_epg_status["mtime"] = datetime.fromtimestamp(RAW_EPG_PATH.stat().st_mtime).isoformat()
+        except Exception as e:
+            logger.error(f"Error getting raw EPG status: {e}")
+    
+    movies_status = {
+        "exists": MOVIES_PATH.exists(),
+        "fresh": False,
+        "mtime": None
+    }
+    if MOVIES_PATH.exists():
+        try:
+            movies_status["fresh"] = is_file_fresh(MOVIES_PATH)
+            movies_status["mtime"] = datetime.fromtimestamp(MOVIES_PATH.stat().st_mtime).isoformat()
+        except Exception as e:
+            logger.error(f"Error getting movies status: {e}")
+    
+    enriched_movies_status = {
+        "exists": ENRICHED_MOVIES_PATH.exists(),
+        "fresh": False,
+        "mtime": None
+    }
+    if ENRICHED_MOVIES_PATH.exists():
+        try:
+            enriched_movies_status["fresh"] = is_file_fresh(ENRICHED_MOVIES_PATH)
+            enriched_movies_status["mtime"] = datetime.fromtimestamp(ENRICHED_MOVIES_PATH.stat().st_mtime).isoformat()
+        except Exception as e:
+            logger.error(f"Error getting enriched movies status: {e}")
+    
     return {
-        "raw_epg": {
-            "exists": RAW_EPG_PATH.exists(),
-            "fresh": is_file_fresh(RAW_EPG_PATH) if RAW_EPG_PATH.exists() else False,
-            "mtime": datetime.fromtimestamp(RAW_EPG_PATH.stat().st_mtime).isoformat() if RAW_EPG_PATH.exists() else None
-        },
-        "movies": {
-            "exists": MOVIES_PATH.exists(),
-            "fresh": is_file_fresh(MOVIES_PATH) if MOVIES_PATH.exists() else False,
-            "mtime": datetime.fromtimestamp(MOVIES_PATH.stat().st_mtime).isoformat() if MOVIES_PATH.exists() else None
-        },
-        "enriched_movies": {
-            "exists": ENRICHED_MOVIES_PATH.exists(),
-            "fresh": is_file_fresh(ENRICHED_MOVIES_PATH) if ENRICHED_MOVIES_PATH.exists() else False,
-            "mtime": datetime.fromtimestamp(ENRICHED_MOVIES_PATH.stat().st_mtime).isoformat() if ENRICHED_MOVIES_PATH.exists() else None
-        },
+        "raw_epg": raw_epg_status,
+        "movies": movies_status,
+        "enriched_movies": enriched_movies_status,
         "posters": {
             "directory_exists": POSTERS_DIR.exists(),
             "count": count_posters(),

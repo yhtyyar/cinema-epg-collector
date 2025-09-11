@@ -1,37 +1,54 @@
-import { Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { memo, useCallback } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearch } from '../../hooks/useSearch';
 
-export default function Header() {
-  const location = useLocation()
-  const [searchQuery, setSearchQuery] = useState('')
+function HeaderComponent() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { query, handleSearch, clearSearch } = useSearch(searchParams.get('q') || '');
+
+  const handleSearchSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (query.trim()) {
+      navigate(`/?q=${encodeURIComponent(query.trim())}`);
+    } else {
+      clearSearch();
+      navigate('/');
+    }
+  }, [query, navigate, clearSearch]);
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    handleSearch(e.target.value);
+  }, [handleSearch]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur" 
-            style={{ 
-              background: 'rgba(10, 10, 10, 0.95)',
-              borderBottom: '1px solid var(--border-color)'
-            }}>
+    <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur"
+      style={{
+        background: 'rgba(10, 10, 10, 0.95)',
+        borderBottom: '1px solid var(--border-color)'
+      }}>
       <div className="container-responsive">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="flex items-center space-x-2 text-xl font-bold gradient-text hover:opacity-80 transition-opacity"
           >
             <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/>
+              <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z" />
             </svg>
             <span>Cinema EPG</span>
           </Link>
 
           {/* Search Bar */}
-          <div className="flex-1 max-w-md mx-8">
+          <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-8">
             <div className="relative">
               <input
                 type="text"
                 placeholder="Поиск фильмов..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={query}
+                onChange={handleSearchChange}
                 className="w-full px-4 py-2 pl-10 rounded-lg focus-ring"
                 style={{
                   background: 'var(--bg-tertiary)',
@@ -39,37 +56,47 @@ export default function Header() {
                   color: 'var(--text-primary)'
                 }}
               />
-              <svg 
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
+              <svg
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
                 style={{ color: 'var(--text-muted)' }}
-                fill="none" 
-                stroke="currentColor" 
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
+              {query && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
-          </div>
+          </form>
 
           {/* Navigation */}
           <nav className="flex items-center space-x-6">
-            <Link 
-              to="/" 
-              className={`text-sm font-medium transition-colors hover:text-white ${
-                location.pathname === '/' 
-                  ? 'gradient-text' 
+            <Link
+              to="/"
+              className={`text-sm font-medium transition-colors hover:text-white ${location.pathname === '/'
+                  ? 'gradient-text'
                   : 'text-gray-400'
-              }`}
+                }`}
             >
               Главная
             </Link>
-            <Link 
-              to="/favorites" 
-              className={`text-sm font-medium transition-colors hover:text-white ${
-                location.pathname === '/favorites' 
-                  ? 'gradient-text' 
+            <Link
+              to="/favorites"
+              className={`text-sm font-medium transition-colors hover:text-white ${location.pathname === '/favorites'
+                  ? 'gradient-text'
                   : 'text-gray-400'
-              }`}
+                }`}
             >
               Избранное
             </Link>
@@ -77,5 +104,7 @@ export default function Header() {
         </div>
       </div>
     </header>
-  )
+  );
 }
+
+export const Header = memo(HeaderComponent);

@@ -38,7 +38,7 @@ class Config:
     api_cache_ttl: int = 300
     api_cors_origins: List[str] = None
     # Pipeline
-    auto_run_pipeline: bool = False
+    auto_run_pipeline: bool = False  # Changed default to False
 
 
 def load_config() -> Config:
@@ -83,7 +83,7 @@ def load_config() -> Config:
     cors_raw = os.getenv("API_CORS_ORIGINS", "*")
     api_cors_origins = [o.strip() for o in cors_raw.split(",") if o.strip()] if cors_raw else ["*"]
 
-    auto_run_pipeline = os.getenv("AUTO_RUN_PIPELINE", "false").lower() == "true"
+    auto_run_pipeline = os.getenv("AUTO_RUN_PIPELINE", "false").lower() == "true"  # Changed default to false
 
     return Config(
         iptv_base_url=iptv_base_url,

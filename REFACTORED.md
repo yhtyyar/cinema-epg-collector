@@ -31,7 +31,14 @@ This document summarizes the changes made to refactor the IPTV EPG Collector pro
 - Updated nginx configuration files with notes about manual deployment
 - Updated frontend Dockerfile with notes about manual deployment
 
-### 4. Files Kept for Reference
+### 4. API Startup Improvements
+- Modified API to start without automatically collecting data
+- Added new endpoint `POST /api/collect-data` to manually trigger data collection
+- Changed default `AUTO_RUN_PIPELINE` setting to `false`
+- Improved handling of missing data files
+- Added comprehensive documentation in API_STARTUP.md
+
+### 5. Files Kept for Reference
 - .github/workflows/ci.yml (CI/CD workflow)
 - All core application code in epg_collector/
 - Frontend application code in frontend/
@@ -54,6 +61,8 @@ For manual deployment on Ubuntu, follow these steps:
 3. **Reduced Complexity**: Removed numerous deployment scripts that were not needed for manual deployment
 4. **Maintained Functionality**: All core application features remain intact
 5. **Better Focus**: Documentation now clearly targets manual deployment rather than multiple deployment methods
+6. **Improved Flexibility**: API can now start without data collection, allowing for better control over when data is collected
+7. **Faster Startup**: API is available immediately without waiting for data collection to complete
 
 ## Files Removed
 
@@ -71,7 +80,7 @@ For manual deployment on Ubuntu, follow these steps:
 
 ## Files Modified
 
-- README.md - Simplified for manual deployment
+- README.md - Simplified for manual deployment and updated with new API endpoint documentation
 - docker-compose.yml - Added notes about manual deployment
 - Dockerfile - Added notes about manual deployment
 - docker-entrypoint.sh - Simplified for manual deployment
@@ -79,10 +88,16 @@ For manual deployment on Ubuntu, follow these steps:
 - nginx.prod.conf - Added notes about manual deployment
 - frontend/Dockerfile - Added notes about manual deployment
 - frontend/README.md - Translated to English and simplified
+- epg_collector/api/app.py - Added manual data collection endpoint and improved startup logic
+- epg_collector/config.py - Changed default AUTO_RUN_PIPELINE to false
+- epg_collector/data_validator.py - Improved error handling for missing files
+- .env.example - Updated default AUTO_RUN_PIPELINE setting
 
 ## Files Added
 
 - UBUNTU_SETUP.md - Detailed Ubuntu installation guide
 - REFACTORED.md - This document
+- API_STARTUP.md - Documentation for API startup without data collection
+- test_api_startup.py - Test script to verify API works without data files
 
-This refactoring makes it much easier for developers to understand how to manually deploy the application on Ubuntu while maintaining all the core functionality.
+This refactoring makes it much easier for developers to understand how to manually deploy the application on Ubuntu while maintaining all the core functionality and adding improved flexibility for API startup.

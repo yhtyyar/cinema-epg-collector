@@ -1,39 +1,42 @@
-import { useSearchParams } from 'react-router-dom'
-import { useState, useMemo, useEffect } from 'react'
-import MovieGrid from '../components/movies/MovieGrid'
-import MovieDaySection from '../components/movies/MovieDaySection'
-import DaySelector, { type DayOption } from '../components/ui/DaySelector'
-import Pagination from '../components/ui/Pagination'
-import LoadingSpinner from '../components/common/LoadingSpinner'
-import ErrorMessage from '../components/common/ErrorMessage'
-import { useMovies } from '../hooks/useMovies'
-import { groupMoviesByDay, getDayLabel } from '../utils/date'
+import { useSearchParams } from 'react-router-dom';
+import { useState, useMemo, useEffect, memo } from 'react';
+import MovieGrid from '../components/movies/MovieGrid';
+import MovieDaySection from '../components/movies/MovieDaySection';
+import DaySelector, { type DayOption } from '../components/ui/DaySelector';
+import Pagination from '../components/ui/Pagination';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import ErrorMessage from '../components/common/ErrorMessage';
+import { useMovies } from '../hooks/useMovies';
+import { groupMoviesByDay, getDayLabel } from '../utils/date';
+import { DEFAULTS } from '../lib/constants';
 
-export default function HomePage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [selectedDayKey, setSelectedDayKey] = useState<string>('')
-  
-  const page = parseInt(searchParams.get('page') || '1')
-  const genre = searchParams.get('genre') || ''
-  const year = searchParams.get('year') || ''
-  const rating = searchParams.get('rating') || ''
-  const source = searchParams.get('source') || ''
-  const q = searchParams.get('q') || ''
+interface HomePageProps { }
+
+function HomePageComponent({ }: HomePageProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedDayKey, setSelectedDayKey] = useState<string>('');
+
+  const page = parseInt(searchParams.get('page') || '1');
+  const genre = searchParams.get('genre') || '';
+  const year = searchParams.get('year') || '';
+  const rating = searchParams.get('rating') || '';
+  const source = searchParams.get('source') || '';
+  const q = searchParams.get('q') || '';
 
   const { data, isLoading, error } = useMovies({
     page,
-    size: 200, // Увеличиваем размер для группировки по дням
+    size: DEFAULTS.MOVIE_PAGE_SIZE, // Увеличиваем размер для группировки по дням
     genre: genre || undefined,
     year: year ? parseInt(year) : undefined,
     rating: rating ? parseFloat(rating) : undefined,
     q: q || undefined
-  })
+  });
 
   // Группируем фильмы по дням
   const daysSections = useMemo(() => {
-    if (!data?.items) return []
-    return groupMoviesByDay(data.items)
-  }, [data?.items])
+    if (!data?.items) return [];
+    return groupMoviesByDay(data.items);
+  }, [data?.items]);
 
   // Создаем опции для селектора дня
   const dayOptions: DayOption[] = useMemo(() => {
@@ -42,28 +45,28 @@ export default function HomePage() {
       label: section.label,
       date: section.date,
       count: section.items.length
-    }))
-  }, [daysSections])
+    }));
+  }, [daysSections]);
 
   // Находим выбранную секцию
   const selectedSection = useMemo(() => {
-    const key = selectedDayKey || daysSections[0]?.key
-    return daysSections.find(section => section.key === key) || daysSections[0]
-  }, [daysSections, selectedDayKey])
+    const key = selectedDayKey || daysSections[0]?.key;
+    return daysSections.find(section => section.key === key) || daysSections[0];
+  }, [daysSections, selectedDayKey]);
 
   // Устанавливаем сегодняшний день по умолчанию
   useEffect(() => {
     if (daysSections.length > 0 && !selectedDayKey) {
-      const todaySection = daysSections.find(s => s.label === 'Сегодня')
-      setSelectedDayKey(todaySection?.key || daysSections[0].key)
+      const todaySection = daysSections.find(s => s.label === 'Сегодня');
+      setSelectedDayKey(todaySection?.key || daysSections[0].key);
     }
-  }, [daysSections, selectedDayKey])
+  }, [daysSections, selectedDayKey]);
 
   const handlePageChange = (newPage: number) => {
-    const newParams = new URLSearchParams(searchParams)
-    newParams.set('page', newPage.toString())
-    setSearchParams(newParams)
-  }
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', newPage.toString());
+    setSearchParams(newParams);
+  };
 
   if (error) {
     return (
@@ -74,7 +77,7 @@ export default function HomePage() {
           </div>
         </main>
       </div>
-    )
+    );
   }
 
   return (
@@ -96,7 +99,7 @@ export default function HomePage() {
           {/* Content */}
           {isLoading ? (
             <div className="flex justify-center py-20">
-              <LoadingSpinner />
+              <LoadingSpinner size="lg" />
             </div>
           ) : (
             <>
@@ -128,9 +131,9 @@ export default function HomePage() {
                           Найдено {data.total || data.items.length} фильмов
                         </p>
                       </div>
-                      
+
                       <MovieGrid movies={data.items} />
-                      
+
                       {data.total > data.size && (
                         <div className="mt-16 flex justify-center">
                           <Pagination
@@ -163,5 +166,7 @@ export default function HomePage() {
         </div>
       </main>
     </div>
-  )
+  );
 }
+
+export default memo(HomePageComponent);
