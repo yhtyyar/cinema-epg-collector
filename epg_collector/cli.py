@@ -86,6 +86,17 @@ def _enrich(limit: Optional[int] = None) -> None:
     if limit is not None:
         movies = movies[:limit]
 
+    # Проверяем, нужно ли пропустить обогащение если данные уже существуют
+    if cfg.skip_enrichment_if_exists and ENRICHED_PATH.exists():
+        try:
+            # Проверяем, есть ли уже обогащенные данные
+            existing_data = json.loads(ENRICHED_PATH.read_text(encoding="utf-8"))
+            if existing_data and len(existing_data) > 0:
+                print(f"[yellow]Данные уже существуют в {ENRICHED_PATH} и SKIP_ENRICHMENT_IF_EXISTS=true, пропускаем обогащение[/yellow]")
+                return
+        except Exception as e:
+            print(f"[yellow]Ошибка при проверке существующих данных: {e}, продолжаем обогащение[/yellow]")
+
     # Загрузим предыдущие результаты обогащения, чтобы переиспользовать уже скачанные постеры и данные
     prev_by_id: Dict[Any, Dict[str, Any]] = {}
     if ENRICHED_PATH.exists():

@@ -106,20 +106,37 @@ def validate_data_freshness(max_age_hours: int = 24) -> Tuple[bool, str]:
     return needs_update, reason_text
 
 
-def should_run_pipeline(force_run: bool = False, max_age_hours: int = 24) -> Tuple[bool, str]:
+def should_run_pipeline(force_run: bool = False, max_age_hours: int = 24, skip_if_exists: bool = False) -> Tuple[bool, str]:
     """
     Определяет, нужно ли запускать пайплайн сбора данных.
     
     Args:
         force_run: Принудительный запуск (например, AUTO_RUN_PIPELINE=true)
         max_age_hours: Максимальный возраст данных в часах
+        skip_if_exists: Пропустить запуск если данные уже существуют (даже если они старые)
         
     Returns:
         Tuple[bool, str]: (нужно_запускать, причина)
     """
+    # Если принудительный запуск, то запускаем в любом случае
     if force_run:
         return True, "принудительный запуск (AUTO_RUN_PIPELINE=true)"
     
+    # Проверяем, существуют ли уже данные и нужно ли пропустить обогащение
+    if skip_if_exists and ENRICHED_MOVIES_PATH.exists():
+        # Дополнительно проверяем, что файл не пустой
+        try:
+            if ENRICHED_MOVIES_PATH.stat().st_size > 0:
+                # Пытаемся загрузить данные, чтобы убедиться, что они корректны
+                import json
+                data = json.loads(ENRICHED_MOVIES_PATH.read_text(encoding="utf-8"))
+                if isinstance(data, list) and len(data) > 0:
+                    return False, "данные уже существуют, пропускаем обогащение (SKIP_ENRICHMENT_IF_EXISTS=true)"
+        except Exception:
+            # Если не удалось прочитать файл, продолжаем как обычно
+            pass
+    
+    # Проверяем актуальность данных
     needs_update, reason = validate_data_freshness(max_age_hours)
     return needs_update, reason
 
@@ -198,12 +215,14 @@ def get_data_status() -> dict:
     enriched_movies_status = {
         "exists": ENRICHED_MOVIES_PATH.exists(),
         "fresh": False,
-        "mtime": None
+        "mtime": None,
+        "size": 0
     }
     if ENRICHED_MOVIES_PATH.exists():
         try:
             enriched_movies_status["fresh"] = is_file_fresh(ENRICHED_MOVIES_PATH)
             enriched_movies_status["mtime"] = datetime.fromtimestamp(ENRICHED_MOVIES_PATH.stat().st_mtime).isoformat()
+            enriched_movies_status["size"] = ENRICHED_MOVIES_PATH.stat().st_size
         except Exception as e:
             logger.error(f"Error getting enriched movies status: {e}")
     

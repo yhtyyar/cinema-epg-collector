@@ -121,10 +121,11 @@ def create_app() -> FastAPI:
             logger.info(f"Статус данных: {data_status}")
             return
         
-        # Проверяем актуальность данных
+        # Проверяем необходимость запуска пайплайна с учетом существующих данных
         should_run, reason = should_run_pipeline(
             force_run=settings.auto_run_pipeline,
-            max_age_hours=24
+            max_age_hours=24,
+            skip_if_exists=settings.skip_enrichment_if_exists
         )
         
         if should_run:

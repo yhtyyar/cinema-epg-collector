@@ -39,6 +39,8 @@ class Config:
     api_cors_origins: List[str] = None
     # Pipeline
     auto_run_pipeline: bool = False  # Changed default to False
+    # Skip enrichment if data already exists
+    skip_enrichment_if_exists: bool = True  # Новый параметр для пропуска обогащения если данные уже есть
 
 
 def load_config() -> Config:
@@ -84,6 +86,7 @@ def load_config() -> Config:
     api_cors_origins = [o.strip() for o in cors_raw.split(",") if o.strip()] if cors_raw else ["*"]
 
     auto_run_pipeline = os.getenv("AUTO_RUN_PIPELINE", "false").lower() == "true"  # Changed default to false
+    skip_enrichment_if_exists = os.getenv("SKIP_ENRICHMENT_IF_EXISTS", "true").lower() == "true"  # Новый параметр
 
     return Config(
         iptv_base_url=iptv_base_url,
@@ -104,4 +107,5 @@ def load_config() -> Config:
         api_cache_ttl=api_cache_ttl,
         api_cors_origins=api_cors_origins,
         auto_run_pipeline=auto_run_pipeline,
+        skip_enrichment_if_exists=skip_enrichment_if_exists,  # Добавляем новый параметр
     )
