@@ -1,7 +1,15 @@
 // Типы для работы с жанрами фильмов
-export type Genre = { 
+export type Genre = {
   id: number
-  name: string 
+  name: string
+}
+
+// Тип для опций даты
+export type DateOption = {
+  date: string
+  displayDate: string
+  isToday: boolean
+  count: number
 }
 
 // Основной тип фильма для фронтенда

@@ -1,6 +1,6 @@
 // components/date-picker/DateSelector.tsx
 import React from 'react';
-import { DateOption } from '../../types/movie-new';
+import { DateOption } from '../../types/movie';
 
 interface DateSelectorProps {
   dateOptions: DateOption[];

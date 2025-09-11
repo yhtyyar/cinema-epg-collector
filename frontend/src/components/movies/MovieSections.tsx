@@ -1,6 +1,6 @@
 import type { Movie } from '../../types/movie'
 import { groupMoviesByDay } from '../../utils/date'
-import MovieCard from './MovieCard'
+import { MovieCard } from './MovieCard'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 

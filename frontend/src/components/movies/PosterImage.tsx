@@ -12,10 +12,10 @@ interface PosterImageProps {
   onError?: () => void
 }
 
-export default function PosterImage({ 
-  src, 
-  alt, 
-  className = '', 
+export default function PosterImage({
+  src,
+  alt,
+  className = '',
   priority = 'normal',
   showShimmer = true,
   onLoad,
@@ -34,9 +34,9 @@ export default function PosterImage({
         const width = img.naturalWidth
         const height = img.naturalHeight
         const ratio = width / height
-        
+
         setDimensions({ width, height })
-        
+
         // Определяем оптимальное соотношение сторон
         if (ratio >= 1.7) {
           setAspectRatio('16/9')   // широкий формат
@@ -76,13 +76,13 @@ export default function PosterImage({
 
   if (!src || error) {
     return (
-      <div 
+      <div
         className={`w-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg flex flex-col items-center justify-center text-gray-400 ${className}`}
         style={{ aspectRatio }}
       >
         <svg className="w-12 h-12 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} 
-                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
         <span className="text-xs font-medium opacity-60">Нет постера</span>
       </div>
@@ -95,9 +95,8 @@ export default function PosterImage({
       {isLoading && showShimmer && (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
       )}
-      
+
       <LazyLoadImage
-        ref={imgRef}
         src={src}
         alt={alt}
         effect="blur"

@@ -1,8 +1,5 @@
 import { Movie } from '../../types/movie';
-import MovieCard from './MovieCard'; omponents / movies / MovieDayView.tsx
-import React from 'react';
-import { Movie } from '../../types/movie';
-import MovieCard from './MovieCard';
+import { MovieCard } from './MovieCard';
 
 interface MovieDayViewProps {
   date: string;
@@ -57,10 +54,9 @@ export const MovieDayView: React.FC<MovieDayViewProps> = ({
           <div key={movie.id} className="relative">
             <MovieCard
               movie={movie}
-              onClick={() => onMovieClick(movie)}
             />
             <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-medium">
-              {formatTime(movie.epg_data.broadcast_time)}
+              {movie.broadcast_time ? formatTime(movie.broadcast_time) : '--:--'}
             </div>
           </div>
         ))}

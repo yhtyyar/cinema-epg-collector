@@ -36,8 +36,8 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     // Извлекаем информацию об ошибке
     const status = error?.response?.status ?? 0;
-    const message = error?.response?.data?.detail ||
-      error?.response?.data?.message ||
+    const message = (error?.response?.data as any)?.detail ||
+      (error?.response?.data as any)?.message ||
       error?.message ||
       'Ошибка сети';
     const details = error?.response?.data;

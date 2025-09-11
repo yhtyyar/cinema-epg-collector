@@ -37,7 +37,7 @@ export default function SearchPage() {
         <>
           <MovieSections movies={data.items} />
           <div className="flex items-center justify-center pt-4">
-            <Pagination page={page} pages={totalPages} onChange={updatePage} />
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={updatePage} />
           </div>
         </>
       )}

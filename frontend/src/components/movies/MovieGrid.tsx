@@ -1,5 +1,5 @@
 import type { Movie } from '../../types/movie'
-import MovieCard from './MovieCard'
+import { MovieCard } from './MovieCard'
 
 export default function MovieGrid({ movies }: { movies: Movie[] }) {
   return (

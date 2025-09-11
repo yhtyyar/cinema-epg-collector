@@ -8,8 +8,8 @@ import { SkeletonDetail } from '../components/common/Skeletons'
 
 export default function MovieDetailPage() {
   const { id = '' } = useParams()
-  const { data: movie, isLoading, isError } = useMovie(id)
-  
+  const { data: movie, isLoading, isError } = useMovie({ id })
+
   // Получаем рекомендации - фильмы того же жанра
   const { data: recommendationsData } = useMovies({
     page: 1,
@@ -29,12 +29,12 @@ export default function MovieDetailPage() {
         <title>{movie.title} · Cinema EPG</title>
         <meta name="description" content={movie.overview?.slice(0, 150)} />
       </Helmet>
-      
+
       <main className="py-8">
         <div className="container mx-auto px-4 space-y-12">
           {/* Детали фильма */}
           <MovieDetail movie={movie} />
-          
+
           {/* Рекомендации */}
           {recommendations.length > 0 && (
             <MovieCarousel

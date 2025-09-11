@@ -1,6 +1,6 @@
 import { type FC, useRef } from 'react';
 import { Movie } from '../../types/movie';
-import MovieCard from '../movies/MovieCard';
+import { MovieCard } from '../movies/MovieCard';
 
 interface MovieCarouselProps {
   title: string;
@@ -9,13 +9,13 @@ interface MovieCarouselProps {
   className?: string;
 }
 
-export const MovieCarousel: React.FC<MovieCarouselProps> = ({
+export const MovieCarousel: FC<MovieCarouselProps> = ({
   title,
   movies,
   onMovieClick,
   className = '',
 }) => {
-  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -76,8 +76,6 @@ export const MovieCarousel: React.FC<MovieCarouselProps> = ({
           >
             <MovieCard
               movie={movie}
-              onClick={() => onMovieClick(movie)}
-              compact={true}
             />
           </div>
         ))}
